@@ -469,7 +469,7 @@ const Project = () => {
                         <div className="d-flex align-items-center justify-content-between mb-2">
                           <div className="d-flex align-items-center gap-2">
                             <h6>
-                              <Link to={`${all_routes.projectdetails}/${project._id}`}>
+                              <Link to={`/projects-details/${project._id}`}>
                                 {project.name}
                               </Link>
                             </h6>

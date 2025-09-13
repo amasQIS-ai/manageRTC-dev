@@ -200,7 +200,7 @@ const ProjectList = () => {
       title: "Project ID",
       dataIndex: "_id",
       render: (text: string, record: Project) => (
-        <Link to={`${all_routes.projectdetails}/${record._id}`}>
+        <Link to={`/projects-details/${record._id}`}>
           {record._id.substring(0, 8).toUpperCase()}
         </Link>
       ),
@@ -481,42 +481,6 @@ const ProjectList = () => {
                       <i className="ti ti-x" />
                     </button>
                   )}
-                  <div className="dropdown">
-                    <Link
-                      to="#"
-                      className="dropdown-toggle btn btn-white d-inline-flex align-items-center"
-                      data-bs-toggle="dropdown"
-                    >
-                      Sort By : Last 7 Days
-                    </Link>
-                    <ul className="dropdown-menu  dropdown-menu-end p-3">
-                      <li>
-                        <Link to="#" className="dropdown-item rounded-1">
-                          Recently Added
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="#" className="dropdown-item rounded-1">
-                          Ascending
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="#" className="dropdown-item rounded-1">
-                          Desending
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="#" className="dropdown-item rounded-1">
-                          Last Month
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="#" className="dropdown-item rounded-1">
-                          Last 7 Days
-                        </Link>
-                      </li>
-                    </ul>
-                  </div>
                 </div>
               </div>
               <div className="card-body p-0">

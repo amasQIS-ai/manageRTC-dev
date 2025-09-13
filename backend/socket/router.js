@@ -7,6 +7,8 @@ import hrDashboardController from "../controllers/hr/hr.controller.js";
 import clientController from "../controllers/client/client.controllers.js";
 import activityController from "../controllers/activities/activities.controllers.js";
 import projectController from "../controllers/project/project.controller.js";
+import taskController from "../controllers/task/task.controller.js";
+import projectNotesController from "../controllers/notes/project.notes.controller.js";
 import { ChatController } from "../controllers/chat/chat.controller.js";
 import { ChatUsersController } from "../controllers/chat/users.controller.js";
 
@@ -55,6 +57,10 @@ const router = (socket, io, role) => {
       activityController(socket, io);
       console.log("Attaching project controller for admin...");
       projectController(socket, io);
+      console.log("Attaching task controller for admin...");
+      taskController(socket, io);
+      console.log("Attaching project notes controller for admin...");
+      projectNotesController(socket, io);
       userSocketController(socket, io);
       console.log("Attaching social feed controller for admin...");
       socialFeedSocketController(socket, io);
@@ -74,6 +80,10 @@ const router = (socket, io, role) => {
       activityController(socket, io);
       console.log("Attaching project controller for hr...");
       projectController(socket, io);
+      console.log("Attaching task controller for hr...");
+      taskController(socket, io);
+      console.log("Attaching project notes controller for hr...");
+      projectNotesController(socket, io);
       userSocketController(socket, io);
       console.log("Attaching social feed controller for hr...");
       socialFeedSocketController(socket, io);
@@ -86,8 +96,8 @@ const router = (socket, io, role) => {
       socialFeedSocketController(socket, io);
       break;
     case "employee":
-       console.log("Attaching Employee controller...");
-       employeeController(socket, io);
+      console.log("Attaching Employee controller...");
+      employeeController(socket, io);
 
       break;
     default:
