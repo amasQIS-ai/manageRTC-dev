@@ -5,9 +5,9 @@ import {
   getPerformanceAppraisalByIdCtrl,
   updatePerformanceAppraisalCtrl,
   deletePerformanceAppraisalCtrl,
-} from '../../controllers/performance/performanceAppraisal.controller.js';
-import { authenticateUser } from '../../controllers/socialfeed/socialFeed.controller.js';
-import { validateCompanyAccess } from '../../controllers/socialfeed/validation.middleware.js';
+} from '../controllers/performance/performanceAppraisal.controller.js';
+import { authenticateUser } from '../controllers/socialfeed/socialFeed.controller.js';
+import { validateCompanyAccess } from '../controllers/socialfeed/validation.middleware.js';
 
 const router = express.Router();
 

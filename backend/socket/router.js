@@ -19,7 +19,6 @@ import trainersController from "../controllers/hr/trainers.controller.js";
 import goalTypeController from "../controllers/performance/goalType.controller.js";
 import goalTrackingController from "../controllers/performance/goalTracking.controller.js";
 import jobController from "../controllers/jobs/jobs.controllers.js";
-import employeeController from "../controllers/employee/employee.controller.js";
 import profileController from "../controllers/pages/profilepage.controllers.js";
 
 

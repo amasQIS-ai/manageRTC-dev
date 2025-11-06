@@ -5,9 +5,9 @@ import {
   getPerformanceIndicatorByIdCtrl,
   updatePerformanceIndicatorCtrl,
   deletePerformanceIndicatorCtrl,
-} from '../../controllers/performance/performanceIndicator.controller.js';
-import { authenticateUser } from '../../controllers/socialfeed/socialFeed.controller.js';
-import { validateCompanyAccess } from '../../controllers/socialfeed/validation.middleware.js';
+} from '../controllers/performance/performanceIndicator.controller.js';
+import { authenticateUser } from '../controllers/socialfeed/socialFeed.controller.js';
+import { validateCompanyAccess } from '../controllers/socialfeed/validation.middleware.js';
 
 const router = express.Router();
 
@@ -34,10 +34,11 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Create a new performance indicator
-router.post('/performance-indicators', createPerformanceIndicatorCtrl);
+// These routes are mounted at /api/performance/indicators in server.js
+router.post('/', createPerformanceIndicatorCtrl);
 
 // Get all performance indicators (supports filters via query params)
-router.get('/performance-indicators', getAllPerformanceIndicatorsCtrl);
+router.get('/', getAllPerformanceIndicatorsCtrl);
 
 // Get a single performance indicator by ID
 router.get('/:id', getPerformanceIndicatorByIdCtrl);
