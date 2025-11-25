@@ -12,6 +12,7 @@ import socialFeedSocketController from "../controllers/socialfeed/socialFeed.soc
 import employeeController from "../controllers/employee/employee.controller.js";
 import notesController from "../controllers/employee/notes.controller.js";
 import ticketsSocketController from "../controllers/tickets/tickets.socket.controller.js";
+import kanbanController from "../controllers/kaban/kaban.controller.js";
 
 import jobsController from "../controllers/jobs/jobs.controllers.js";
 import candidateController from "../controllers/candidates/candidates.controllers.js";
@@ -68,6 +69,9 @@ const router = (socket, io, role) => {
       userSocketController(socket, io);
       console.log("Attaching social feed controller for admin...");
       socialFeedSocketController(socket, io);
+      console.log("Attaching kanban controller for admin...");
+      kanbanController(socket, io);
+
 
       // Pipelines JS
       pipelineController(socket, io);
@@ -120,6 +124,8 @@ const router = (socket, io, role) => {
       jobsController(socket, io);
       console.log("Attaching candidate controller for hr...");
       candidateController(socket, io);
+      console.log("Attaching kanban controller for hr...");
+      kanbanController(socket, io);
 
       performanceIndicatorController(socket, io);
       performanceAppraisalController(socket, io);
@@ -142,6 +148,8 @@ const router = (socket, io, role) => {
       userSocketController(socket, io);
       console.log("Attaching social feed controller for leads...");
       socialFeedSocketController(socket, io);
+      console.log("Attaching kanban controller for leads...");
+      kanbanController(socket, io);
       break;
 
     case "employee":
