@@ -1622,7 +1622,7 @@ export const publicRoutes = [
     roles: ["public"],
   },
   {
-    path: routes.projectdetails,
+    path: "/projects-details/:projectId",
     element: <ProjectDetails />,
     route: Route,
     roles: ["public"],
@@ -1640,7 +1640,7 @@ export const publicRoutes = [
     roles: ["public"],
   },
   {
-    path: routes.tasksdetails,
+    path: "/task-details/:taskId",
     element: <TaskDetails />,
     route: Route,
     roles: ["public"],
