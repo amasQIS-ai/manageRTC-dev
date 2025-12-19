@@ -670,7 +670,7 @@ const EmployeeList = () => {
       render: (text: String, record: any) => (
         <Link to={`/employees/${record._id}`}>{text}</Link>
       ),
-      sorter: (a: any, b: any) => a.EmpId.length - b.EmpId.length,
+      sorter: (a: any, b: any) => (a.employeeId || "").length - (b.employeeId || "").length,
     },
     {
       title: "Name",
@@ -696,24 +696,24 @@ const EmployeeList = () => {
           </div>
         );
       },
-      sorter: (a: any, b: any) => a.Name.length - b.Name.length,
+      sorter: (a: any, b: any) => (a.firstName || "").localeCompare(b.firstName || ""),
     },
     {
       title: "Email",
       dataIndex: ["contact", "email"],
-      sorter: (a: any, b: any) => a.Email.length - b.Email.length,
+      sorter: (a: any, b: any) => (a.contact?.email || "").localeCompare(b.contact?.email || ""),
     },
     {
       title: "Phone",
       dataIndex: ["contact", "phone"],
-      sorter: (a: any, b: any) => a.Phone.length - b.Phone.length,
+      sorter: (a: any, b: any) => (a.contact?.phone || "").localeCompare(b.contact?.phone || ""),
     },
     {
       title: "Department",
       dataIndex: "departmentId",
       render: (text: string, record: any) =>
         department.find((dep) => dep.value === record.departmentId)?.label,
-      sorter: (a: any, b: any) => a.Designation.length - b.Designation.length,
+      sorter: (a: any, b: any) => (a.departmentId || "").localeCompare(b.departmentId || ""),
     },
     {
       title: "Joining Date",
@@ -746,7 +746,7 @@ const EmployeeList = () => {
           {text}
         </span>
       ),
-      sorter: (a: any, b: any) => a.Status.length - b.Status.length,
+      sorter: (a: any, b: any) => (a.status || "").localeCompare(b.status || ""),
     },
     {
       title: "",
@@ -2152,10 +2152,11 @@ const EmployeeList = () => {
                 
                 {/* Department Filter - Dropdown */}
                 <div className="dropdown me-3">
-                  <Link
-                    to="#"
+                  <a
+                    href="#"
                     className="dropdown-toggle btn btn-white d-inline-flex align-items-center"
                     data-bs-toggle="dropdown"
+                    onClick={(e) => e.preventDefault()}
                   >
                     Department
                     {selectedDepartment
@@ -2165,7 +2166,7 @@ const EmployeeList = () => {
                           )?.label || "None"
                         }`
                       : ": All"}
-                  </Link>
+                  </a>
                   <ul className="dropdown-menu dropdown-menu-end p-3">
                     <li>
                       <Link
@@ -2206,10 +2207,11 @@ const EmployeeList = () => {
 
                 {/* Status Filter - Dropdown */}
                 <div className="dropdown me-3">
-                  <Link
-                    to="#"
+                  <a
+                    href="#"
                     className="dropdown-toggle btn btn-white d-inline-flex align-items-center"
                     data-bs-toggle="dropdown"
+                    onClick={(e) => e.preventDefault()}
                   >
                     Status
                     {selectedStatus
@@ -2218,7 +2220,7 @@ const EmployeeList = () => {
                           selectedStatus.slice(1)
                         }`
                       : ": All"}
-                  </Link>
+                  </a>
                   <ul className="dropdown-menu dropdown-menu-end p-3">
                     <li>
                       <Link
@@ -2257,10 +2259,11 @@ const EmployeeList = () => {
 
                 {/* Sort Filter - Dropdown */}
                 <div className="dropdown me-3">
-                  <Link
-                    to="#"
+                  <a
+                    href="#"
                     className="dropdown-toggle btn btn-white d-inline-flex align-items-center"
                     data-bs-toggle="dropdown"
+                    onClick={(e) => e.preventDefault()}
                   >
                     Sort By
                     {sortOrder
@@ -2268,7 +2271,7 @@ const EmployeeList = () => {
                           sortOrder.charAt(0).toUpperCase() + sortOrder.slice(1)
                         }`
                       : ": Default"}
-                  </Link>
+                  </a>
                   <ul className="dropdown-menu dropdown-menu-end p-3">
                     <li>
                       <Link
