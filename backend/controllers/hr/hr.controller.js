@@ -449,14 +449,19 @@ const hrDashboardController = (socket, io) => {
         const dt = DateTime.fromFormat(rawDate, "yyyy-MM-dd", { zone: "utc" });
         const now = DateTime.utc();
 
+        // Extract applyToAll flag - when true, policy applies to all employees
+        const applyToAll = payload.applyToAll === true;
+        
         // Extract assignTo mappings (department-designation mappings)
+        // When applyToAll is true, we don't need assignTo mappings
         const assignTo = Array.isArray(payload.assignTo) ? payload.assignTo : [];
 
         if (!policyName) {
           throw new Error("Policy name is required");
         }
-        if (!assignTo || assignTo.length === 0) {
-          throw new Error("Please select at least one department to assign this policy");
+        // Only require assignTo when applyToAll is false
+        if (!applyToAll && (!assignTo || assignTo.length === 0)) {
+          throw new Error("Please select at least one department or enable 'All Employees'");
         }
         if (!description) {
           throw new Error("Description is required");
@@ -474,7 +479,8 @@ const hrDashboardController = (socket, io) => {
 
         const policyData = {
           policyName,
-          assignTo,
+          applyToAll,
+          assignTo: applyToAll ? [] : assignTo,  // Empty array for all employees
           effectiveDate,
           policyDescription: description,
         };
@@ -550,14 +556,19 @@ const hrDashboardController = (socket, io) => {
         const formattedDate = dt.toFormat("yyyy-MM-dd");
         const now = DateTime.utc();
 
+        // Extract applyToAll flag - when true, policy applies to all employees
+        const applyToAll = data.applyToAll === true;
+        
         // Extract assignTo mappings (department-designation mappings)
+        // When applyToAll is true, we don't need assignTo mappings
         const assignTo = Array.isArray(data.assignTo) ? data.assignTo : [];
 
         if (!policyName) {
           throw new Error("Policy name is required");
         }
-        if (!assignTo || assignTo.length === 0) {
-          throw new Error("Please select at least one department to assign this policy");
+        // Only require assignTo when applyToAll is false
+        if (!applyToAll && (!assignTo || assignTo.length === 0)) {
+          throw new Error("Please select at least one department or enable 'All Employees'");
         }
         if (!description) {
           throw new Error("Description is required");
@@ -573,7 +584,8 @@ const hrDashboardController = (socket, io) => {
         const payload = {
           policyId,
           policyName,
-          assignTo,
+          applyToAll,
+          assignTo: applyToAll ? [] : assignTo,  // Empty array for all employees
           effectiveDate: formattedDate,
           policyDescription: description,
         };

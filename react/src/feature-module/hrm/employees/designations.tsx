@@ -719,7 +719,9 @@ const Designations = () => {
                 <div className="row">
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Designation Name</label>
+                      <label className="form-label">
+                        Designation Name <span className="text-danger">*</span>
+                      </label>
                       <input 
                         type="text" 
                         className={`form-control ${designationNameError ? 'is-invalid' : ''}`}
@@ -741,7 +743,9 @@ const Designations = () => {
                   </div>
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Department Name</label>
+                      <label className="form-label">
+                        Department Name <span className="text-danger">*</span>
+                      </label>
                       {loading ? (
                         <div className="form-control">
                           <small>Loading departments...</small>

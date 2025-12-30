@@ -230,6 +230,7 @@ interface Policy {
     policyName: string;
     policyDescription: string;
     effectiveDate: string;
+    applyToAll?: boolean;  // When true, policy applies to all employees
     assignTo?: DepartmentDesignationMapping[];
 }
 
@@ -1286,7 +1287,10 @@ const EmployeeDetails = () => {
         if (!employee || !policies.length) return [];
 
         return policies.filter(policy => {
-            // If no assignTo mappings, the policy doesn't apply to anyone
+            // If applyToAll is true, this policy applies to ALL employees (current and future)
+            if (policy.applyToAll === true) return true;
+
+            // If no assignTo mappings and not applyToAll, the policy doesn't apply to anyone
             if (!policy.assignTo || policy.assignTo.length === 0) return false;
 
             // Check if any department-designation mapping matches the employee

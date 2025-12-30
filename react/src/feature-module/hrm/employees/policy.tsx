@@ -10,13 +10,15 @@ import { Socket } from "socket.io-client";
 import { DateTime } from 'luxon';
 import Footer from "../../../core/common/footer";
 import DepartmentDesignationSelector, { DepartmentDesignationMapping } from '../../../components/DepartmentDesignationSelector';
+import { hideModal } from '../../../utils/modalUtils';
 
 interface Policy {
   _id: string,
   policyName: string;
   policyDescription: string;
   effectiveDate: string;
-  assignTo?: DepartmentDesignationMapping[];  // Department-Designation mappings
+  applyToAll?: boolean;  // When true, policy applies to all current and future employees
+  assignTo?: DepartmentDesignationMapping[];  // Department-Designation mappings (used when applyToAll is false)
 }
 
 interface Department {
@@ -60,9 +62,22 @@ const Policy = () => {
   
   // NEW: State for Apply To mappings
   const [applyToMappings, setApplyToMappings] = useState<DepartmentDesignationMapping[]>([]);
+  const [applyToAll, setApplyToAll] = useState<boolean>(false);
   
   // State for viewing policy details
   const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null);
+
+  // Validation error states for Add Policy modal
+  const [policyNameError, setPolicyNameError] = useState<string | null>(null);
+  const [effectiveDateError, setEffectiveDateError] = useState<string | null>(null);
+  const [applyToError, setApplyToError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
+
+  // Validation error states for Edit Policy modal
+  const [editPolicyNameError, setEditPolicyNameError] = useState<string | null>(null);
+  const [editEffectiveDateError, setEditEffectiveDateError] = useState<string | null>(null);
+  const [editApplyToError, setEditApplyToError] = useState<string | null>(null);
+  const [editDescriptionError, setEditDescriptionError] = useState<string | null>(null);
 
   const socket = useSocket() as Socket | null;
 
@@ -100,8 +115,13 @@ const Policy = () => {
         if (socket) {
           socket.emit("hr/policy/get");
         }
+        // Close modal after successful backend response
+        hideModal('add_policy');
+        
+        // Reset form after successful submission
+        resetAddPolicyForm();
       } else {
-        setError(response.error || "Failed to add policy");
+        parseBackendError(response.error || "Failed to add policy");
         setLoading(false);
       }
     };
@@ -131,8 +151,14 @@ const Policy = () => {
         if (socket) {
           socket.emit("hr/policy/get");
         }
+        
+        // Close modal after successful backend response
+        hideModal('edit_policy');
+        
+        // Reset validation errors after successful submission
+        resetEditPolicyForm();
       } else {
-        setError(response.error || "Failed to add policy");
+        parseBackendError(response.error || "Failed to update policy", true);
         setLoading(false);
       }
     }
@@ -239,7 +265,16 @@ const Policy = () => {
     {
       title: "Assign To",
       dataIndex: "assignTo",
-      render: (assignTo: DepartmentDesignationMapping[]) => {
+      render: (assignTo: DepartmentDesignationMapping[], record: Policy) => {
+        // Check if policy applies to all employees
+        if (record.applyToAll) {
+          return (
+            <h6 className="fw-normal fs-14 text-success">
+              <i className="ti ti-users me-1"></i>
+              All Employees
+            </h6>
+          );
+        }
         if (!assignTo || assignTo.length === 0) {
           return <span className="text-muted">Not assigned</span>;
         }
@@ -251,6 +286,9 @@ const Policy = () => {
         );
       },
       sorter: (a: any, b: any) => {
+        // Sort "All Employees" first
+        if (a.applyToAll && !b.applyToAll) return -1;
+        if (!a.applyToAll && b.applyToAll) return 1;
         const aName = a.assignTo?.[0]?.departmentName || "";
         const bName = b.assignTo?.[0]?.departmentName || "";
         return aName.localeCompare(bName);
@@ -305,6 +343,8 @@ const Policy = () => {
             data-bs-target="#edit_policy"
             onClick={() => { 
               setEditingPolicy(policy);
+              // Set applyToAll state from policy
+              setApplyToAll(policy.applyToAll || false);
               // Initialize mappings from policy data
               if (policy.assignTo && policy.assignTo.length > 0) {
                 setApplyToMappings(policy.assignTo);
@@ -339,27 +379,133 @@ const Policy = () => {
 
   // helper functions
 
+  // Helper function to parse backend errors and map them to field-specific errors
+  const parseBackendError = (
+    errorMessage: string,
+    isEditMode: boolean = false
+  ) => {
+    // Clear all errors first
+    if (isEditMode) {
+      setEditPolicyNameError(null);
+      setEditEffectiveDateError(null);
+      setEditApplyToError(null);
+      setEditDescriptionError(null);
+    } else {
+      setPolicyNameError(null);
+      setEffectiveDateError(null);
+      setApplyToError(null);
+      setDescriptionError(null);
+    }
+
+    // Convert error message to lowercase for easier matching
+    const error = errorMessage.toLowerCase();
+
+    // Map backend errors to specific fields
+    if (error.includes("policy name") || error.includes("policyname")) {
+      if (isEditMode) {
+        setEditPolicyNameError(errorMessage);
+      } else {
+        setPolicyNameError(errorMessage);
+      }
+    } else if (error.includes("effective date") || error.includes("effectivedate") || 
+               error.includes("in-effect date") || error.includes("date") ||
+               error.includes("future")) {
+      if (isEditMode) {
+        setEditEffectiveDateError(errorMessage);
+      } else {
+        setEffectiveDateError(errorMessage);
+      }
+    } else if (error.includes("department") || error.includes("designation") || 
+               error.includes("apply") || error.includes("assign")) {
+      if (isEditMode) {
+        setEditApplyToError(errorMessage);
+      } else {
+        setApplyToError(errorMessage);
+      }
+    } else if (error.includes("description") || error.includes("policydescription")) {
+      if (isEditMode) {
+        setEditDescriptionError(errorMessage);
+      } else {
+        setDescriptionError(errorMessage);
+      }
+    } else {
+      // If we can't map to a specific field, show as general error
+      setError(errorMessage);
+    }
+  };
+
+  // Helper function to validate future date
+  const isFutureDate = (dateString: string): boolean => {
+    if (!dateString) return false;
+    const selectedDate = new Date(dateString);
+    const today = new Date();
+    // Set time to 00:00:00 for accurate date comparison
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    return selectedDate >= today;
+  };
+
+  // Reset Add Policy form fields and errors
+  const resetAddPolicyForm = () => {
+    setPolicyName("");
+    setEffectiveDate("");
+    setDescription("");
+    setSelectedDepartment(staticOptions[0].value);
+    setApplyToMappings([]);
+    setApplyToAll(false);
+    setError(null);
+    setPolicyNameError(null);
+    setEffectiveDateError(null);
+    setApplyToError(null);
+    setDescriptionError(null);
+  };
+
+  // Reset Edit Policy validation errors
+  const resetEditPolicyForm = () => {
+    setError(null);
+    setEditPolicyNameError(null);
+    setEditEffectiveDateError(null);
+    setEditApplyToError(null);
+    setEditDescriptionError(null);
+  };
+
   const handleSubmit = () => {
     try {
+      // Clear all errors at the start
+      setPolicyNameError(null);
+      setEffectiveDateError(null);
+      setApplyToError(null);
+      setDescriptionError(null);
       setError(null);
 
+      // Validate all fields
+      let hasError = false;
+
       if (!policyName.trim()) {
-        setError("Policy Name is required");
-        return;
+        setPolicyNameError("Policy Name is required");
+        hasError = true;
       }
 
       if (!effectiveDate) {
-        setError("Effective Date is required");
-        return;
+        setEffectiveDateError("Effective Date is required");
+        hasError = true;
+      } else if (!isFutureDate(effectiveDate)) {
+        setEffectiveDateError("Effective Date must be in the future");
+        hasError = true;
       }
 
-      if (!applyToMappings || applyToMappings.length === 0) {
-        setError("Please select at least one department to apply this policy");
-        return;
+      if (!applyToAll && (!applyToMappings || applyToMappings.length === 0)) {
+        setApplyToError("Please select at least one department or enable 'All Employees'");
+        hasError = true;
       }
 
-      if (!description) {
-        setError("Description is required");
+      if (!description || !description.trim()) {
+        setDescriptionError("Description is required");
+        hasError = true;
+      }
+
+      // If any validation failed, stop here
+      if (hasError) {
         return;
       }
 
@@ -367,12 +513,17 @@ const Policy = () => {
 
       const payload = {
         policyName,
-        assignTo: applyToMappings,
+        applyToAll,
+        assignTo: applyToAll ? [] : applyToMappings,  // Empty array means applies to all current and future employees
         policyDescription: description,
         effectiveDate,
       };
+      
       if (socket) {
         socket.emit("hr/policy/add", payload);
+        
+        // Note: Modal will only close after successful backend response
+        // The handleAddPolicyResponse will close the modal if response.done is true
       } else {
         setError("Socket connection is not available.");
         setLoading(false);
@@ -456,7 +607,13 @@ const Policy = () => {
 
   const handleUpdateSubmit = (editingPolicy: Policy) => {
     try {
+      // Clear all errors at the start
+      setEditPolicyNameError(null);
+      setEditEffectiveDateError(null);
+      setEditApplyToError(null);
+      setEditDescriptionError(null);
       setError(null);
+
       const { _id, policyName, effectiveDate, policyDescription } = editingPolicy;
 
       if (!_id) {
@@ -464,23 +621,34 @@ const Policy = () => {
         return;
       }
 
-      if (!policyName) {
-        setError("Policy Name is required");
-        return;
+      // Validate all fields
+      let hasError = false;
+
+      if (!policyName || !policyName.trim()) {
+        setEditPolicyNameError("Policy Name is required");
+        hasError = true;
       }
 
       if (!effectiveDate) {
-        setError("Effective Date is required");
-        return;
+        setEditEffectiveDateError("Effective Date is required");
+        hasError = true;
+      } else if (!isFutureDate(effectiveDate)) {
+        setEditEffectiveDateError("Effective Date must be in the future");
+        hasError = true;
       }
 
-      if (!applyToMappings || applyToMappings.length === 0) {
-        setError("Please select at least one department to apply this policy");
-        return;
+      if (!applyToAll && (!applyToMappings || applyToMappings.length === 0)) {
+        setEditApplyToError("Please select at least one department or enable 'All Employees'");
+        hasError = true;
       }
 
-      if (!policyDescription) {
-        setError("Description is required");
+      if (!policyDescription || !policyDescription.trim()) {
+        setEditDescriptionError("Description is required");
+        hasError = true;
+      }
+
+      // If any validation failed, stop here
+      if (hasError) {
         return;
       }
 
@@ -488,14 +656,18 @@ const Policy = () => {
 
       const payload = {
         _id,
-        policyName,
-        policyDescription,
-        assignTo: applyToMappings,
+        policyName: policyName.trim(),
+        policyDescription: policyDescription.trim(),
+        applyToAll,
+        assignTo: applyToAll ? [] : applyToMappings,  // Empty array means applies to all current and future employees
         effectiveDate,
       };
 
       if (socket) {
         socket.emit("hr/policy/update", payload);
+        
+        // Note: Modal will only close after successful backend response
+        // The handleUpdatePolicyResponse will close the modal if response.done is true
       } else {
         setError("Socket connection is not available.");
         setLoading(false);
@@ -628,6 +800,7 @@ const Policy = () => {
                     setDescription("");
                     setSelectedDepartment(staticOptions[0].value);
                     setApplyToMappings([]);
+                    setApplyToAll(false);
                     setError(null);
                   }}
                 >
@@ -754,7 +927,8 @@ const Policy = () => {
                   setEffectiveDate("");
                   setDescription("");
                   setSelectedDepartment(staticOptions[0].value);
-                  setApplyToMappings([]);  // NEW: Reset mappings
+                  setApplyToMappings([]);
+                  setApplyToAll(false);
                   setError(null);
                 }}
               >
@@ -766,15 +940,50 @@ const Policy = () => {
                 <div className="row">
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Policy Name</label>
-                      <input type="text" className="form-control"
-                        value={policyName} onChange={(e) => setPolicyName(e.target.value)} />
+                      <label className="form-label">
+                        Policy Name <span className="text-danger">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        className={`form-control ${policyNameError ? 'is-invalid' : ''}`}
+                        value={policyName} 
+                        onChange={(e) => {
+                          setPolicyName(e.target.value);
+                          // Clear error when user starts typing
+                          if (policyNameError) {
+                            setPolicyNameError(null);
+                          }
+                        }} 
+                      />
+                      {policyNameError && (
+                        <div className="invalid-feedback d-block">
+                          {policyNameError}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">In-effect Date</label>
-                      <input type="date" className="form-control" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+                      <label className="form-label">
+                        In-effect Date <span className="text-danger">*</span>
+                      </label>
+                      <input 
+                        type="date" 
+                        className={`form-control ${effectiveDateError ? 'is-invalid' : ''}`}
+                        value={effectiveDate} 
+                        onChange={(e) => {
+                          setEffectiveDate(e.target.value);
+                          // Clear error when user selects a date
+                          if (effectiveDateError) {
+                            setEffectiveDateError(null);
+                          }
+                        }} 
+                      />
+                      {effectiveDateError && (
+                        <div className="invalid-feedback d-block">
+                          {effectiveDateError}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-md-12">
@@ -782,24 +991,50 @@ const Policy = () => {
                       departments={departments}
                       designations={designations}
                       selectedMappings={applyToMappings}
-                      onChange={setApplyToMappings}
+                      applyToAll={applyToAll}
+                      onChange={(mappings, isApplyToAll) => {
+                        setApplyToMappings(mappings);
+                        setApplyToAll(isApplyToAll);
+                        // Clear error when user changes selection
+                        if (applyToError) {
+                          setApplyToError(null);
+                        }
+                      }}
                       label="Apply To"
                       required={true}
-                      helpText="Toggle departments ON to apply this policy, then customize designation selections as needed"
+                      helpText="Use 'All Employees' toggle to apply to everyone (includes future employees), or select specific departments and designations"
                     />
+                    {applyToError && (
+                      <div className="invalid-feedback d-block mt-2">
+                        {applyToError}
+                      </div>
+                    )}
                   </div>
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Policy Description</label>
+                      <label className="form-label">
+                        Policy Description <span className="text-danger">*</span>
+                      </label>
                       <div className="policy-description-container">
                         <textarea
-                          className="form-control"
+                          className={`form-control ${descriptionError ? 'is-invalid' : ''}`}
                           rows={4}
                           placeholder="Enter policy details and description here..."
                           value={description}
-                          onChange={(e) => setDescription(e.target.value)}
+                          onChange={(e) => {
+                            setDescription(e.target.value);
+                            // Clear error when user starts typing
+                            if (descriptionError) {
+                              setDescriptionError(null);
+                            }
+                          }}
                           maxLength={5000}
                         />
+                        {descriptionError && (
+                          <div className="invalid-feedback d-block">
+                            {descriptionError}
+                          </div>
+                        )}
                         <div className="d-flex justify-content-between mt-2">
                           <small className="text-muted">
                             {description.length}/5000 characters
@@ -815,19 +1050,16 @@ const Policy = () => {
                   type="button"
                   className="btn btn-white border me-2"
                   data-bs-dismiss="modal"
-                  onClick={() => {
-                    setPolicyName("");
-                    setEffectiveDate("");
-                    setDescription("");
-                    setSelectedDepartment(staticOptions[0].value);
-                    setApplyToMappings([]);
-                    setError(null);
-                  }}
+                  onClick={resetAddPolicyForm}
                 >
                   Cancel
                 </button>
-                <button type="button" data-bs-dismiss="modal" className="btn btn-primary"
-                  disabled={loading} onClick={handleSubmit}>
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  disabled={loading} 
+                  onClick={handleSubmit}
+                >
                   Add Policy
                 </button>
               </div>
@@ -856,28 +1088,52 @@ const Policy = () => {
                 <div className="row">
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Policy Name</label>
+                      <label className="form-label">
+                        Policy Name <span className="text-danger">*</span>
+                      </label>
                       <input
                         type="text"
-                        className="form-control"
+                        className={`form-control ${editPolicyNameError ? 'is-invalid' : ''}`}
                         value={editingPolicy?.policyName || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setEditingPolicy(prev =>
-                            prev ? { ...prev, policyName: e.target.value } : prev)}
+                            prev ? { ...prev, policyName: e.target.value } : prev);
+                          // Clear error when user starts typing
+                          if (editPolicyNameError) {
+                            setEditPolicyNameError(null);
+                          }
+                        }}
                       />
+                      {editPolicyNameError && (
+                        <div className="invalid-feedback d-block">
+                          {editPolicyNameError}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">In-effect Date</label>
+                      <label className="form-label">
+                        In-effect Date <span className="text-danger">*</span>
+                      </label>
                       <input
                         type="date"
-                        className="form-control"
+                        className={`form-control ${editEffectiveDateError ? 'is-invalid' : ''}`}
                         value={editingPolicy?.effectiveDate?.slice(0, 10) || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setEditingPolicy(prev =>
-                            prev ? { ...prev, effectiveDate: e.target.value } : prev)}
+                            prev ? { ...prev, effectiveDate: e.target.value } : prev);
+                          // Clear error when user selects a date
+                          if (editEffectiveDateError) {
+                            setEditEffectiveDateError(null);
+                          }
+                        }}
                       />
+                      {editEffectiveDateError && (
+                        <div className="invalid-feedback d-block">
+                          {editEffectiveDateError}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-md-12">
@@ -885,28 +1141,52 @@ const Policy = () => {
                       departments={departments}
                       designations={designations}
                       selectedMappings={applyToMappings}
-                      onChange={setApplyToMappings}
+                      applyToAll={applyToAll}
+                      onChange={(mappings, isApplyToAll) => {
+                        setApplyToMappings(mappings);
+                        setApplyToAll(isApplyToAll);
+                        // Clear error when user changes selection
+                        if (editApplyToError) {
+                          setEditApplyToError(null);
+                        }
+                      }}
                       label="Apply To"
                       required={true}
-                      helpText="Toggle departments ON to apply this policy, then customize designation selections as needed"
+                      helpText="Use 'All Employees' toggle to apply to everyone (includes future employees), or select specific departments and designations"
                     />
+                    {editApplyToError && (
+                      <div className="invalid-feedback d-block mt-2">
+                        {editApplyToError}
+                      </div>
+                    )}
                   </div>
                   <div className="col-md-12">
                     <div className="mb-3">
-                      <label className="form-label">Policy Description</label>
+                      <label className="form-label">
+                        Policy Description <span className="text-danger">*</span>
+                      </label>
                       <div className="policy-description-container">
                         <textarea
-                          className="form-control"
+                          className={`form-control ${editDescriptionError ? 'is-invalid' : ''}`}
                           rows={4}
                           placeholder="Enter policy details and description here..."
                           value={editingPolicy?.policyDescription || ""}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setEditingPolicy(prev =>
                               prev ? { ...prev, policyDescription: e.target.value } : prev
-                            )
-                          }
+                            );
+                            // Clear error when user starts typing
+                            if (editDescriptionError) {
+                              setEditDescriptionError(null);
+                            }
+                          }}
                           maxLength={5000}
                         />
+                        {editDescriptionError && (
+                          <div className="invalid-feedback d-block">
+                            {editDescriptionError}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -917,21 +1197,21 @@ const Policy = () => {
                   type="button"
                   className="btn btn-white border me-2"
                   data-bs-dismiss="modal"
+                  onClick={resetEditPolicyForm}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  data-bs-dismiss="modal"
                   className="btn btn-primary"
                   onClick={() => {
                     if (editingPolicy) {
                       handleUpdateSubmit(editingPolicy);
                     }
                   }}
-                  disabled={!editingPolicy}
+                  disabled={!editingPolicy || loading}
                 >
-                  Update Policy
+                  {loading ? 'Saving...' : 'Update Policy'}
                 </button>
               </div>
             </form>
@@ -1030,7 +1310,23 @@ const Policy = () => {
                       <h5 className="mb-0 text-muted">Applicable To</h5>
                     </div>
                     <div className="ps-4">
-                      {viewingPolicy.assignTo && viewingPolicy.assignTo.length > 0 ? (
+                      {/* Check if policy applies to all employees */}
+                      {viewingPolicy.applyToAll ? (
+                        <div className="border rounded p-4 bg-success bg-opacity-10">
+                          <div className="d-flex align-items-center">
+                            <span className="avatar avatar-lg bg-success me-3">
+                              <i className="ti ti-users fs-24"></i>
+                            </span>
+                            <div>
+                              <h5 className="text-success mb-1">All Employees</h5>
+                              <p className="text-muted mb-0 small">
+                                <i className="ti ti-info-circle me-1"></i>
+                                This policy applies to all current and future employees, departments, and designations.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : viewingPolicy.assignTo && viewingPolicy.assignTo.length > 0 ? (
                         <div className="departments-list">
                           {viewingPolicy.assignTo.map((mapping, index) => {
                             const deptDesignations = designations.filter(
