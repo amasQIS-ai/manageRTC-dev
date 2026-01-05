@@ -69,8 +69,7 @@ const allowedOrigins = [
   "https://dev.manage-rtc.com",
   "https://apidev.manage-rtc.com",
   process.env.FRONTEND_URL,
-  "*",
-];
+].filter(Boolean);
 
 const authorizedParties = [
   "https://devhrms-pm.amasqis.ai/",
