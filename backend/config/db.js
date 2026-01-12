@@ -106,6 +106,7 @@ export const getTenantCollections = (tenantDbName) => {
     // Performance Management Collections
     goalTypes: db.collection("goalTypes"),
     goalTrackings: db.collection("goalTrackings"),
+    promotions: db.collection("promotions"),
     //profile collection
     profile: db.collection("profile"),
     tickets: db.collection("tickets"),
