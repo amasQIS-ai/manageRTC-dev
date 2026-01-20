@@ -407,7 +407,7 @@ const EmployeeList = () => {
       if (!isMounted) return;
 
       if (response.done && Array.isArray(response.data)) {
-        console.log("Designations response:", response);
+        // console.log("Designations response:", response);
 
         // Map all designations from the response
         const mappedDesignations = response.data.map((d: Designation) => ({
@@ -457,9 +457,9 @@ const EmployeeList = () => {
 
     const handleEmployeeResponse = (response: any) => {
       if (!isMounted) return;
-      console.log("response hrm-employee", response);
+      // console.log("response hrm-employee", response);
       if (response.done) {
-        console.log("response hrm-employee", response);
+        // console.log("response hrm-employee", response);
         if (response.data.stats) {
           setStats(response.data.stats);
         }
@@ -605,7 +605,7 @@ const EmployeeList = () => {
   useEffect(() => {
     if (editingEmployee && socket) {
       // Fetch designations for the employee's department
-      console.log("Emitting for departmentID", editingEmployee.departmentId);
+      // console.log("Emitting for departmentID", editingEmployee.departmentId);
 
       if (editingEmployee.departmentId) {
         socket.emit("hrm/designations/get", {
@@ -806,7 +806,6 @@ const EmployeeList = () => {
       ),
     },
   ];
-  console.log("Editing employee", editingEmployee);
 
   const [passwordVisibility, setPasswordVisibility] = useState({
     password: false,
@@ -1424,6 +1423,89 @@ const EmployeeList = () => {
     return true;
   };
 
+  const validateEditForm = (): boolean => {
+    // Ensure we have an employee to validate
+    console.log("Validating editing employee:", editingEmployee);
+    if (!editingEmployee) {
+      setFieldErrors({ general: "No employee selected for editing" });
+      return false;
+    }
+
+    const errors: Record<string, string> = {};
+
+    // Required fields (must match backend requiredStringFields)
+    if (!editingEmployee.firstName || !editingEmployee.firstName.trim()) {
+      errors.firstName = "First name is required";
+    }
+
+    if (!editingEmployee.lastName || !editingEmployee.lastName.trim()) {
+      errors.lastName = "Last name is required";
+    }
+
+    if (!editingEmployee.departmentId || !editingEmployee.departmentId.trim()) {
+      errors.departmentId = "Department is required";
+    }
+
+    if (!editingEmployee.designationId || !editingEmployee.designationId.trim()) {
+      errors.designationId = "Designation is required";
+    }
+
+    // Account fields (required by backend)
+    if (!editingEmployee.account?.userName || !editingEmployee.account.userName.trim()) {
+      errors.userName = "Username is required";
+    }
+
+    // Contact fields (required by backend)
+    const email = editingEmployee.contact?.email || "";
+    if (!email.trim()) {
+      errors.email = "Email is required";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.email = "Enter a valid email";
+      }
+    }
+
+    const phone = editingEmployee.contact?.phone || "";
+    if (!phone.trim()) {
+      errors.phone = "Phone number is required";
+    } else if (!/^\d{10,15}$/.test(phone.replace(/[\s\-\(\)]/g, ''))) {
+      errors.phone = "Enter a valid phone number";
+    }
+
+    // Date of joining (required by backend)
+    if (!editingEmployee.dateOfJoining) {
+      errors.dateOfJoining = "Joining date is required";
+    }
+
+    // Set errors in state
+    setFieldErrors(errors);
+
+    // If there are errors, show toast and scroll to first error field
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fill all required fields correctly", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      
+      // Scroll to first error field after a short delay
+      setTimeout(() => {
+        const firstErrorField = Object.keys(errors)[0];
+        const errorElement = document.querySelector(`[name="${firstErrorField}"]`) || 
+                            document.querySelector(`#${firstErrorField}`) ||
+                            document.querySelector(`.field-${firstErrorField}`);
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          (errorElement as HTMLElement).focus?.();
+        }
+      }, 100);
+      
+      return false;
+    }
+
+    return true;
+  };
+
   // Handle form submission (final save - validation already done in handleNext)
   const handleSubmit = async (e: React.FormEvent) => {
     console.log("Submitting form and permissions");
@@ -1507,10 +1589,17 @@ const EmployeeList = () => {
   // 1. Update basic info
   const handleUpdateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    if (!validateEditForm()) {
+      return false;
+    }
+
     if (!editingEmployee) {
       toast.error("No employee selected for editing.");
-      return;
+      return false;
     }
+    return false;
     const payload = {
       employeeId: editingEmployee.employeeId || "",
       firstName: editingEmployee.firstName || "",
@@ -1580,7 +1669,6 @@ const EmployeeList = () => {
       // toast.error("Socket connection is not available.");
     }
   };
-  console.log("editing employee", editingEmployee);
   const handleResetFormData = () => {
     setFormData({
       employeeId: generateId("EMP"),
@@ -2413,7 +2501,7 @@ const EmployeeList = () => {
               data-bs-dismiss="modal"
               style={{ display: "none" }}
             />
-            <form action={all_routes.employeeList} onSubmit={handleSubmit}>
+            <form action={all_routes.employeeList}>
               <div className="contact-grids-tab">
                 <ul className="nav nav-underline" id="myTab" role="tablist">
                   <li className="nav-item" role="presentation">
@@ -3223,9 +3311,10 @@ const EmployeeList = () => {
                       Cancel
                     </button>
                     <button
-                      type="submit"
+                      type="button"
                       className="btn btn-primary"
                       disabled={isValidating || loading}
+                      onClick={handleSubmit}
                     >
                       {isValidating ? (
                         <>
@@ -3797,26 +3886,7 @@ const EmployeeList = () => {
                       </div>
                       <div className="col-md-6">
                         <div className="mb-3">
-                          <label className="form-label">
-                            Company<span className="text-danger"> *</span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={editingEmployee?.companyName || ""}
-                            onChange={(e) =>
-                              setEditingEmployee((prev) =>
-                                prev
-                                  ? { ...prev, companyName: e.target.value }
-                                  : prev
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="mb-3">
-                          <label className="form-label">Department</label>
+                          <label className="form-label">Department <span className="text-danger"> *</span></label>
                           <CommonSelect
                             key={`dept-${editingEmployee?._id}-${editingEmployee?.departmentId}`}
                             className="select"
@@ -3860,7 +3930,7 @@ const EmployeeList = () => {
                       </div>
                       <div className="col-md-6">
                         <div className="mb-3">
-                          <label className="form-label">Designation</label>
+                          <label className="form-label">Designation <span className="text-danger"> *</span></label>
                           <CommonSelect
                             key={`desig-${editingEmployee?._id}-${editingEmployee?.designationId}`}
                             className="select"
