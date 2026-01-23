@@ -1,5 +1,5 @@
 import React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { all_routes } from "../../router/all_routes";
 import { Link, useNavigate } from "react-router-dom";
 import Table from "../../../core/common/dataTable/index";
@@ -15,6 +15,7 @@ import { Socket } from "socket.io-client";
 import { toast, ToastContainer } from "react-toastify";
 import dayjs from "dayjs";
 import Footer from "../../../core/common/footer";
+import { useUser } from "@clerk/clerk-react";
 
 interface Department {
   _id: string;
@@ -53,7 +54,7 @@ interface Employee {
   lastName: string;
   avatarUrl: string;
   account?: {
-    userName: string;
+    role: string;
   };
   contact?: {
     email: string;
@@ -106,7 +107,6 @@ const normalizeStatus = (status: string | undefined): "Active" | "Inactive" | "O
 };
 
 // Type definitions
-type PasswordField = "password" | "confirmPassword";
 type PermissionAction =
   | "read"
   | "write"
@@ -242,6 +242,9 @@ const initialState = {
 };
 
 const EmployeeList = () => {
+  const ClerkID = useUser();
+  console.log("User id", ClerkID.user.id);
+
   // const {  isLoaded } = useUser();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -257,18 +260,19 @@ const EmployeeList = () => {
   const [designation, setDesignation] = useState<Option[]>([]);
   const [allDesignations, setAllDesignations] = useState<Option[]>([]);
   const [filteredDesignations, setFilteredDesignations] = useState<Option[]>(
-    []
+    [],
   );
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedDesignation, setSelectedDesignation] = useState<string>("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
-    null
+    null,
   );
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [newlyAddedEmployee, setNewlyAddedEmployee] = useState<Employee | null>(null);
+  const [newlyAddedEmployee, setNewlyAddedEmployee] = useState<Employee | null>(
+    null,
+  );
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
@@ -310,8 +314,7 @@ const EmployeeList = () => {
       phone: "",
     },
     account: {
-      userName: "",
-      password: "",
+      role: "",
     },
     personal: {
       gender: "",
@@ -362,14 +365,14 @@ const EmployeeList = () => {
         setError(null);
         setFieldErrors({});
         setLoading(false);
-        
+
         // Close the add employee modal
         if (addEmployeeModalRef.current) {
           addEmployeeModalRef.current.click();
           // Clean up backdrop
           setTimeout(() => closeModal(), 100);
         }
-        
+
         // Store the newly added employee data
         if (response.data && response.data.employee) {
           setNewlyAddedEmployee(response.data.employee);
@@ -377,7 +380,7 @@ const EmployeeList = () => {
           // If the response structure is different, try to use the whole data
           setNewlyAddedEmployee(response.data);
         }
-        
+
         // Show success modal with navigation options
         setTimeout(() => {
           if (successModalRef.current) {
@@ -386,44 +389,65 @@ const EmployeeList = () => {
             closeModal();
           }
         }, 300);
-        
+
         // Refresh employee list
         if (socket) {
           socket.emit("hrm/employees/get-employee-stats");
         }
       } else {
         setLoading(false);
-        
+
         // Parse error and set inline field error
-        const errorInfo = parseBackendError(response.error || "Failed to add employee");
+        const errorInfo = parseBackendError(
+          response.error || "Failed to add employee",
+        );
         if (errorInfo) {
           setFieldErrors({ [errorInfo.field]: errorInfo.message });
-          
+
           // If error is for a basic field, switch to basic info tab, reset validation, and scroll
-          const basicFields = ['firstName', 'lastName', 'email', 'userName', 'password', 'phone', 'departmentId', 'designationId', 'dateOfJoining'];
-          if (basicFields.includes(errorInfo.field) || errorInfo.field === 'general') {
+          const basicFields = [
+            "firstName",
+            "lastName",
+            "email",
+            "role",
+            "phone",
+            "departmentId",
+            "designationId",
+            "dateOfJoining",
+          ];
+          if (
+            basicFields.includes(errorInfo.field) ||
+            errorInfo.field === "general"
+          ) {
             setActiveTab("basic-info");
             setIsBasicInfoValidated(false); // Reset validation flag
             setTimeout(() => {
-              const errorElement = document.querySelector(`[name="${errorInfo.field}"]`) || 
-                                  document.querySelector(`#${errorInfo.field}`) ||
-                                  document.querySelector('.is-invalid');
+              const errorElement =
+                document.querySelector(`[name="${errorInfo.field}"]`) ||
+                document.querySelector(`#${errorInfo.field}`) ||
+                document.querySelector(".is-invalid");
               if (errorElement) {
-                errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                errorElement.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
                 (errorElement as HTMLElement).focus?.();
               }
             }, 100);
           }
         } else {
-          setFieldErrors({ general: response.error || "Failed to add employee" });
+          setFieldErrors({
+            general: response.error || "Failed to add employee",
+          });
         }
-        
+
         setError(response.error || "Failed to add employee");
         // No toast - error shown inline only
       }
     };
 
     const handleDesignationResponse = (response: any) => {
+      console.log("DESIGNatio");
       if (!isMounted) return;
 
       if (response.done && Array.isArray(response.data)) {
@@ -440,12 +464,12 @@ const EmployeeList = () => {
         // If we're editing and the designation exists in the new list, keep it selected
         if (editingEmployee?.designationId) {
           const designationExists = response.data.some(
-            (d: Designation) => d._id === editingEmployee.designationId
+            (d: Designation) => d._id === editingEmployee.designationId,
           );
           if (!designationExists) {
             setSelectedDesignation("");
             setEditingEmployee((prev) =>
-              prev ? { ...prev, designationId: "" } : prev
+              prev ? { ...prev, designationId: "" } : prev,
             );
           }
         }
@@ -509,19 +533,19 @@ const EmployeeList = () => {
         setResponseData(response.data);
         setError(null);
         setLoading(false);
-        
+
         toast.success("Employee deleted successfully!", {
           position: "top-right",
           autoClose: 3000,
         });
-        
+
         if (socket) {
           socket.emit("hrm/employees/get-employee-stats");
         }
       } else {
         setError(response.error || "Failed to delete employee");
         setLoading(false);
-        
+
         toast.error(response.error || "Failed to delete employee", {
           position: "top-right",
           autoClose: 3000,
@@ -537,12 +561,12 @@ const EmployeeList = () => {
           // Clean up backdrop
           setTimeout(() => closeModal(), 100);
         }
-        
+
         toast.success("Employee updated successfully!", {
           position: "top-right",
           autoClose: 3000,
         });
-        
+
         // Refresh employee list
         if (socket) {
           socket.emit("hrm/employees/get-employee-stats");
@@ -572,7 +596,7 @@ const EmployeeList = () => {
           position: "top-right",
           autoClose: 3000,
         });
-        
+
         // Refresh employee list or permissions
         if (socket) {
           socket.emit("hrm/employees/get-employee-stats");
@@ -614,17 +638,17 @@ const EmployeeList = () => {
     socket.on("hr/departments/get-response", handleDepartmentResponse);
     socket.on(
       "hrm/employees/get-employee-stats-response",
-      handleEmployeeResponse
+      handleEmployeeResponse,
     );
     socket.on(
       "hrm/employees/get-employee-grid-stats-response",
-      handleEmployeeResponse
+      handleEmployeeResponse,
     );
     socket.on("hrm/employees/delete-response", handleEmployeeDelete);
     socket.on("hrm/employees/update-response", handleUpdateEmployeeResponse);
     socket.on(
       "hrm/employees/update-permissions-response",
-      handleUpdatePermissionResponse
+      handleUpdatePermissionResponse,
     );
     socket.on(
       "hrm/employees/check-lifecycle-status-response",
@@ -639,17 +663,17 @@ const EmployeeList = () => {
       socket.off("hr/departments/get-response", handleDepartmentResponse);
       socket.off(
         "hrm/employees/get-employee-stats-response",
-        handleEmployeeResponse
+        handleEmployeeResponse,
       );
       socket.off(
         "hrm/employees/get-employee-grid-stats-response",
-        handleEmployeeResponse
+        handleEmployeeResponse,
       );
       socket.off("hrm/employees/delete-response", handleEmployeeDelete);
       socket.off("hrm/employees/update-response", handleUpdateEmployeeResponse);
       socket.off(
         "hrm/employees/update-permissions-response",
-        handleUpdatePermissionResponse
+        handleUpdatePermissionResponse,
       );
       socket.off(
         "hrm/employees/check-lifecycle-status-response",
@@ -695,6 +719,23 @@ const EmployeeList = () => {
     }
   }, [editingEmployee]);
 
+  // Dynamically compute available status filters based on actual employee data
+  const availableStatusFilters = useMemo(() => {
+    // Get unique statuses from employees
+    const uniqueStatuses = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.status) {
+        uniqueStatuses.add(normalizeStatus(emp.status));
+      }
+    });
+    
+    // Convert to filter format and sort
+    const statusOrder = ["Active", "Inactive", "On Notice", "On Leave", "Resigned", "Terminated"];
+    return Array.from(uniqueStatuses)
+      .sort((a, b) => statusOrder.indexOf(a) - statusOrder.indexOf(b))
+      .map(status => ({ text: status, value: status }));
+  }, [employees]);
+
   // Clean up modal backdrops on component unmount or when activeTab changes
   useEffect(() => {
     return () => {
@@ -710,14 +751,14 @@ const EmployeeList = () => {
     };
 
     // Listen for Bootstrap modal hidden events
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-      modal.addEventListener('hidden.bs.modal', handleModalHidden);
+    const modals = document.querySelectorAll(".modal");
+    modals.forEach((modal) => {
+      modal.addEventListener("hidden.bs.modal", handleModalHidden);
     });
 
     return () => {
-      modals.forEach(modal => {
-        modal.removeEventListener('hidden.bs.modal', handleModalHidden);
+      modals.forEach((modal) => {
+        modal.removeEventListener("hidden.bs.modal", handleModalHidden);
       });
     };
   }, []);
@@ -730,7 +771,8 @@ const EmployeeList = () => {
       render: (text: String, record: any) => (
         <Link to={`/employees/${record._id}`}>{text}</Link>
       ),
-      sorter: (a: any, b: any) => (a.employeeId || "").length - (b.employeeId || "").length,
+      sorter: (a: any, b: any) =>
+        (a.employeeId || "").length - (b.employeeId || "").length,
     },
     {
       title: "Name",
@@ -746,24 +788,28 @@ const EmployeeList = () => {
           />
         );
       },
-      sorter: (a: any, b: any) => (a.firstName || "").localeCompare(b.firstName || ""),
+      sorter: (a: any, b: any) =>
+        (a.firstName || "").localeCompare(b.firstName || ""),
     },
     {
       title: "Email",
       dataIndex: ["contact", "email"],
-      sorter: (a: any, b: any) => (a.contact?.email || "").localeCompare(b.contact?.email || ""),
+      sorter: (a: any, b: any) =>
+        (a.contact?.email || "").localeCompare(b.contact?.email || ""),
     },
     {
       title: "Phone",
       dataIndex: ["contact", "phone"],
-      sorter: (a: any, b: any) => (a.contact?.phone || "").localeCompare(b.contact?.phone || ""),
+      sorter: (a: any, b: any) =>
+        (a.contact?.phone || "").localeCompare(b.contact?.phone || ""),
     },
     {
       title: "Department",
       dataIndex: "departmentId",
       render: (text: string, record: any) =>
         department.find((dep) => dep.value === record.departmentId)?.label,
-      sorter: (a: any, b: any) => (a.departmentId || "").localeCompare(b.departmentId || ""),
+      sorter: (a: any, b: any) =>
+        (a.departmentId || "").localeCompare(b.departmentId || ""),
     },
     {
       title: "Joining Date",
@@ -815,22 +861,18 @@ const EmployeeList = () => {
         );
       },
       sorter: (a: any, b: any) => (a.status || "").localeCompare(b.status || ""),
-      filters: [
-        { text: "Active", value: "Active" },
-        { text: "On Notice", value: "On Notice" },
-        { text: "Resigned", value: "Resigned" },
-        { text: "Terminated", value: "Terminated" },
-        { text: "Inactive", value: "Inactive" },
-        { text: "On Leave", value: "On Leave" },
-      ],
-      onFilter: (value: any, record: any) => record.status === value,
+      filters: availableStatusFilters,
+      onFilter: (value: any, record: any) => normalizeStatus(record.status) === value,
     },
     {
       title: "",
       dataIndex: "actions",
       key: "actions",
       render: (_test: any, employee: Employee) => (
-        <div className="action-icon d-inline-flex" key={`actions-${employee._id}`}>
+        <div
+          className="action-icon d-inline-flex"
+          key={`actions-${employee._id}`}
+        >
           <Link
             to="#"
             className="me-2"
@@ -850,7 +892,7 @@ const EmployeeList = () => {
                       acc[key as PermissionModule] = false;
                       return acc;
                     },
-                    {} as Record<PermissionModule, boolean>
+                    {} as Record<PermissionModule, boolean>,
                   ),
                 });
               }
@@ -887,16 +929,11 @@ const EmployeeList = () => {
   ];
   // console.log("Editing employee", editingEmployee);
 
-  const [passwordVisibility, setPasswordVisibility] = useState({
-    password: false,
-    confirmPassword: false,
-  });
-
   // Helper functions
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     if (name === "email" || name === "phone") {
@@ -907,7 +944,7 @@ const EmployeeList = () => {
           [name]: value,
         },
       }));
-    } else if (name === "userName" || name === "password") {
+    } else if (name === "role") {
       setFormData((prev) => ({
         ...prev,
         account: {
@@ -987,7 +1024,7 @@ const EmployeeList = () => {
       setSelectedDepartment("");
       setSelectedStatus("");
       setSortOrder("");
-      
+
       if (socket) {
         socket.emit("hrm/employees/get-employee-stats", {
           startDate: "",
@@ -1016,7 +1053,7 @@ const EmployeeList = () => {
       {
         method: "POST",
         body: formData,
-      }
+      },
     );
 
     const data = await res.json();
@@ -1025,7 +1062,7 @@ const EmployeeList = () => {
   };
 
   const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     // setLoading(true);
     const file = event.target.files?.[0];
@@ -1077,7 +1114,7 @@ const EmployeeList = () => {
   };
 
   const handleDateRangeFilter = (
-    ranges: { start?: string; end?: string } = { start: "", end: "" }
+    ranges: { start?: string; end?: string } = { start: "", end: "" },
   ) => {
     try {
       if (ranges.start && ranges.end) {
@@ -1101,12 +1138,6 @@ const EmployeeList = () => {
   };
 
   // Toggle password visibility
-  const togglePasswordVisibility = (field: PasswordField) => {
-    setPasswordVisibility((prev) => ({
-      ...prev,
-      [field]: !prev[field],
-    }));
-  };
 
   const handleSort = (order: string) => {
     setSortOrder(order);
@@ -1187,7 +1218,7 @@ const EmployeeList = () => {
   const handlePermissionChange = (
     module: PermissionModule,
     action: PermissionAction,
-    checked: boolean
+    checked: boolean,
   ) => {
     setPermissions((prev) => {
       const updatedModulePermissions = {
@@ -1234,7 +1265,7 @@ const EmployeeList = () => {
           acc[action] = newSelectAllState;
           return acc;
         },
-        {} as PermissionSet
+        {} as PermissionSet,
       );
 
       return {
@@ -1255,10 +1286,13 @@ const EmployeeList = () => {
   const toggleAllModules = (enable: boolean) => {
     setPermissions((prev) => {
       const newEnabledModules: Record<PermissionModule, boolean> =
-        MODULES.reduce((acc, module) => {
-          acc[module] = enable;
-          return acc;
-        }, {} as Record<PermissionModule, boolean>);
+        MODULES.reduce(
+          (acc, module) => {
+            acc[module] = enable;
+            return acc;
+          },
+          {} as Record<PermissionModule, boolean>,
+        );
 
       return {
         ...prev,
@@ -1272,17 +1306,20 @@ const EmployeeList = () => {
     setPermissions((prev) => {
       // Build new permissions for every module & action
       const newPermissions: Record<PermissionModule, PermissionSet> =
-        MODULES.reduce((accModules, module) => {
-          const newModulePermissions: PermissionSet = ACTIONS.reduce(
-            (accActions, action) => {
-              accActions[action] = checked;
-              return accActions;
-            },
-            {} as PermissionSet
-          );
-          accModules[module] = newModulePermissions;
-          return accModules;
-        }, {} as Record<PermissionModule, PermissionSet>);
+        MODULES.reduce(
+          (accModules, module) => {
+            const newModulePermissions: PermissionSet = ACTIONS.reduce(
+              (accActions, action) => {
+                accActions[action] = checked;
+                return accActions;
+              },
+              {} as PermissionSet,
+            );
+            accModules[module] = newModulePermissions;
+            return accModules;
+          },
+          {} as Record<PermissionModule, PermissionSet>,
+        );
 
       // Build new selectAll flags for every module
       const newSelectAll: Record<PermissionModule, boolean> = MODULES.reduce(
@@ -1290,7 +1327,7 @@ const EmployeeList = () => {
           acc[module] = checked;
           return acc;
         },
-        {} as Record<PermissionModule, boolean>
+        {} as Record<PermissionModule, boolean>,
       );
 
       return {
@@ -1306,29 +1343,86 @@ const EmployeeList = () => {
   // ======================
 
   // Parse backend error message and map to field name
-  const parseBackendError = (errorMessage: string): { field: string; message: string } | null => {
+  const parseBackendError = (
+    errorMessage: string,
+  ): { field: string; message: string } | null => {
     const errorMap: Record<string, { field: string; message: string }> = {
-      "Field 'about' must be a non-empty string": { field: "about", message: "About is required" },
-      "Field 'about' must be a string if provided": { field: "about", message: "About must be text" },
-      "Field 'departmentId' must be a non-empty string": { field: "departmentId", message: "Please select a department" },
-      "Field 'designationId' must be a non-empty string": { field: "designationId", message: "Please select a designation" },
-      "Field 'employeeId' must be a non-empty string": { field: "employeeId", message: "Employee ID is required" },
-      "Field 'firstName' must be a non-empty string": { field: "firstName", message: "First name is required" },
-      "Field 'lastName' must be a non-empty string": { field: "lastName", message: "Last name is required" },
-      "Missing required field: account": { field: "general", message: "Account information is required" },
-      "Field 'account.userName' must be a non-empty string": { field: "userName", message: "Username is required" },
-      "Field 'account.password' must be a non-empty string": { field: "password", message: "Password is required" },
-      "Missing required field: contact": { field: "general", message: "Contact information is required" },
-      "Field 'contact.email' must be a non-empty string": { field: "email", message: "Email is required" },
-      "Field 'contact.phone' must be a non-empty string": { field: "phone", message: "Phone is required" },
-      "Missing required field: dateOfJoining": { field: "dateOfJoining", message: "Joining date is required" },
-      "dateOfJoining must be a string, Date object, or valid date wrapper": { field: "dateOfJoining", message: "Invalid joining date" },
-      "Email already registered": { field: "email", message: "This email is already registered" },
-      "Username already exists": { field: "userName", message: "This username is already taken" },
-      "Phone number already registered": { field: "phone", message: "This phone number is already registered" },
-      "Employee email or phone number already exists.": { field: "email", message: "Email or phone already exists" },
-      "Employee with same details already exists": { field: "general", message: "Employee with same details already exists" },
-      "Failed to add employee": { field: "general", message: "Failed to add employee. Please try again." },
+      "Field 'about' must be a non-empty string": {
+        field: "about",
+        message: "About is required",
+      },
+      "Field 'about' must be a string if provided": {
+        field: "about",
+        message: "About must be text",
+      },
+      "Field 'departmentId' must be a non-empty string": {
+        field: "departmentId",
+        message: "Please select a department",
+      },
+      "Field 'designationId' must be a non-empty string": {
+        field: "designationId",
+        message: "Please select a designation",
+      },
+      "Field 'employeeId' must be a non-empty string": {
+        field: "employeeId",
+        message: "Employee ID is required",
+      },
+      "Field 'firstName' must be a non-empty string": {
+        field: "firstName",
+        message: "First name is required",
+      },
+      "Field 'lastName' must be a non-empty string": {
+        field: "lastName",
+        message: "Last name is required",
+      },
+      "Missing required field: account": {
+        field: "general",
+        message: "Account information is required",
+      },
+      "Field 'account.role' must be a non-empty string": {
+        field: "role",
+        message: "Role is required",
+      },
+      "Missing required field: contact": {
+        field: "general",
+        message: "Contact information is required",
+      },
+      "Field 'contact.email' must be a non-empty string": {
+        field: "email",
+        message: "Email is required",
+      },
+      "Field 'contact.phone' must be a non-empty string": {
+        field: "phone",
+        message: "Phone is required",
+      },
+      "Missing required field: dateOfJoining": {
+        field: "dateOfJoining",
+        message: "Joining date is required",
+      },
+      "dateOfJoining must be a string, Date object, or valid date wrapper": {
+        field: "dateOfJoining",
+        message: "Invalid joining date",
+      },
+      "Email already registered": {
+        field: "email",
+        message: "This email is already registered",
+      },
+      "Phone number already registered": {
+        field: "phone",
+        message: "This phone number is already registered",
+      },
+      "Employee email or phone number already exists.": {
+        field: "email",
+        message: "Email or phone already exists",
+      },
+      "Employee with same details already exists": {
+        field: "general",
+        message: "Employee with same details already exists",
+      },
+      "Failed to add employee": {
+        field: "general",
+        message: "Failed to add employee. Please try again.",
+      },
     };
 
     // Direct match
@@ -1341,7 +1435,9 @@ const EmployeeList = () => {
     if (fieldMatch) {
       const fieldPath = fieldMatch[1];
       // Extract last part of nested field (e.g., 'account.userName' -> 'userName')
-      const fieldName = fieldPath.includes('.') ? fieldPath.split('.').pop()! : fieldPath;
+      const fieldName = fieldPath.includes(".")
+        ? fieldPath.split(".").pop()!
+        : fieldPath;
       return { field: fieldName, message: errorMessage };
     }
 
@@ -1349,7 +1445,9 @@ const EmployeeList = () => {
     const missingMatch = errorMessage.match(/Missing required field: (.+)/);
     if (missingMatch) {
       const fieldPath = missingMatch[1];
-      const fieldName = fieldPath.includes('.') ? fieldPath.split('.').pop()! : fieldPath;
+      const fieldName = fieldPath.includes(".")
+        ? fieldPath.split(".").pop()!
+        : fieldPath;
       return { field: fieldName, message: `${fieldName} is required` };
     }
 
@@ -1370,20 +1468,14 @@ const EmployeeList = () => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(value)) return "Enter a valid email";
         break;
-      case "userName":
-        if (!value || !value.trim()) return "Username is required";
+      case "role":
+        if (!value || !value.trim()) return "role is required";
         break;
-      case "password":
-        if (!value || !value.trim()) return "Password is required";
-        if (value.length < 6) return "Password must be at least 6 characters";
-        break;
-      case "confirmPassword":
-        if (!value || !value.trim()) return "Confirm password is required";
-        if (formData.account.password !== value) return "Passwords don't match";
-        break;
+
       case "phone":
         if (!value || !value.trim()) return "Phone number is required";
-        if (!/^\d{10,15}$/.test(value.replace(/[\s\-\(\)]/g, ''))) return "Enter a valid phone number";
+        if (!/^\d{10,15}$/.test(value.replace(/[\s\-\(\)]/g, "")))
+          return "Enter a valid phone number";
         break;
       case "gender":
         if (!value) return "Gender is required";
@@ -1401,15 +1493,15 @@ const EmployeeList = () => {
   // Validate a field on blur
   const handleFieldBlur = (fieldName: string, value: any) => {
     const error = validateField(fieldName, value);
-    setFieldErrors(prev => ({
+    setFieldErrors((prev) => ({
       ...prev,
-      [fieldName]: error
+      [fieldName]: error,
     }));
   };
 
   // Clear field error when user starts typing
   const clearFieldError = (fieldName: string) => {
-    setFieldErrors(prev => {
+    setFieldErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors[fieldName];
       return newErrors;
@@ -1437,23 +1529,6 @@ const EmployeeList = () => {
       errors.designationId = "Designation is required";
     }
 
-    // Account fields (required by backend)
-    if (!formData.account.userName || !formData.account.userName.trim()) {
-      errors.userName = "Username is required";
-    }
-
-    if (!formData.account.password || !formData.account.password.trim()) {
-      errors.password = "Password is required";
-    } else if (formData.account.password.length < 6) {
-      errors.password = "Password must be at least 6 characters";
-    }
-
-    if (!confirmPassword || !confirmPassword.trim()) {
-      errors.confirmPassword = "Confirm password is required";
-    } else if (formData.account.password !== confirmPassword) {
-      errors.confirmPassword = "Passwords don't match";
-    }
-
     // Contact fields (required by backend)
     if (!formData.contact.email || !formData.contact.email.trim()) {
       errors.email = "Email is required";
@@ -1466,7 +1541,9 @@ const EmployeeList = () => {
 
     if (!formData.contact.phone || !formData.contact.phone.trim()) {
       errors.phone = "Phone number is required";
-    } else if (!/^\d{10,15}$/.test(formData.contact.phone.replace(/[\s\-\(\)]/g, ''))) {
+    } else if (
+      !/^\d{10,15}$/.test(formData.contact.phone.replace(/[\s\-\(\)]/g, ""))
+    ) {
       errors.phone = "Enter a valid phone number";
     }
 
@@ -1484,19 +1561,20 @@ const EmployeeList = () => {
     // If there are errors, scroll to first error field
     if (Object.keys(errors).length > 0) {
       setActiveTab("basic-info");
-      
+
       // Scroll to first error field after a short delay to allow tab switch
       setTimeout(() => {
         const firstErrorField = Object.keys(errors)[0];
-        const errorElement = document.querySelector(`[name="${firstErrorField}"]`) || 
-                            document.querySelector(`#${firstErrorField}`) ||
-                            document.querySelector(`.field-${firstErrorField}`);
+        const errorElement =
+          document.querySelector(`[name="${firstErrorField}"]`) ||
+          document.querySelector(`#${firstErrorField}`) ||
+          document.querySelector(`.field-${firstErrorField}`);
         if (errorElement) {
-          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
           (errorElement as HTMLElement).focus?.();
         }
       }, 100);
-      
+
       return false;
     }
 
@@ -1721,7 +1799,7 @@ const EmployeeList = () => {
         lastName,
         dateOfJoining,
         contact: { email, phone },
-        account: { userName, password },
+        account: { role },
         personal,
         companyName,
         departmentId,
@@ -1736,7 +1814,7 @@ const EmployeeList = () => {
         firstName,
         lastName,
         dateOfJoining,
-        account: { userName, password },
+        account: { role },
         contact: { email, phone },
         personal: {
           gender: personal?.gender || "",
@@ -1753,12 +1831,13 @@ const EmployeeList = () => {
         departmentId,
         designationId,
         about,
-        status,
+        status: normalizeStatus(status),
       };
 
       // Prepare full submission data
       const submissionData = {
         employeeData: basicInfo,
+        clerkId: ClerkID,
         permissionsData: {
           permissions: permissions.permissions,
           enabledModules: permissions.enabledModules,
@@ -1776,7 +1855,6 @@ const EmployeeList = () => {
 
       // Directly save - validation already done in handleNext
       socket.emit("hrm/employees/add", submissionData);
-      
     } catch (error) {
       console.error("Error submitting form and permissions:", error);
       setError("An error occurred while submitting data.");
@@ -1811,7 +1889,7 @@ const EmployeeList = () => {
       firstName: editingEmployee.firstName || "",
       lastName: editingEmployee.lastName || "",
       account: {
-        userName: editingEmployee.account?.userName || "",
+        role: editingEmployee.account?.role || "",
       },
       contact: {
         email: editingEmployee.contact?.email || "",
@@ -1894,8 +1972,7 @@ const EmployeeList = () => {
         phone: "",
       },
       account: {
-        userName: "",
-        password: "",
+        role: "",
       },
       personal: {
         gender: "",
@@ -1918,7 +1995,7 @@ const EmployeeList = () => {
     setPermissions(initialState);
     setError("");
     setFieldErrors({});
-    setConfirmPassword("");
+
     setIsBasicInfoValidated(false);
   };
 
@@ -1926,7 +2003,7 @@ const EmployeeList = () => {
   const prepareEmployeeForEdit = (emp: Employee): Employee => {
     return {
       ...emp,
-      account: emp.account || { userName: "" },
+      account: emp.account || { role: "" },
       contact: emp.contact || { email: "", phone: "" },
       personal: emp.personal || {
         gender: "",
@@ -1960,20 +2037,158 @@ const EmployeeList = () => {
   // Utility function to properly close modal and remove backdrop
   const closeModal = () => {
     // Remove all modal backdrops
-    const backdrops = document.querySelectorAll('.modal-backdrop');
-    backdrops.forEach(backdrop => backdrop.remove());
-    
+    const backdrops = document.querySelectorAll(".modal-backdrop");
+    backdrops.forEach((backdrop) => backdrop.remove());
+
     // Remove modal-open class from body
-    document.body.classList.remove('modal-open');
-    
+    document.body.classList.remove("modal-open");
+
     // Reset body style
-    document.body.style.overflow = '';
-    document.body.style.paddingRight = '';
+    document.body.style.overflow = "";
+    document.body.style.paddingRight = "";
+  };
+
+  // Handle "Save and Next" - validate with backend before going to permissions tab
+  const handleNext = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Clear previous errors
+    setFieldErrors({});
+    setError(null);
+
+    // First run frontend validation (fast, synchronous)
+    if (!validateForm()) {
+      return;
+    }
+
+    // Check if socket is available
+    if (!socket) {
+      setFieldErrors({
+        general: "Connection unavailable. Please refresh the page.",
+      });
+      return;
+    }
+
+    // Show validating state
+    setIsValidating(true);
+
+    // Check for duplicate email, phone, and username with backend
+    try {
+      // Create a promise to wait for backend response
+      const checkDuplicates = new Promise<{
+        done: boolean;
+        error?: string;
+        field?: string;
+      }>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error("timeout"));
+        }, 15000); // 15 second timeout
+
+        // Listen for duplicate check response
+        const responseHandler = (response: any) => {
+          console.log(
+            "=== FRONTEND: Received response from backend ===",
+            response,
+          );
+          clearTimeout(timeoutId);
+          resolve(response);
+        };
+
+        socket.once("hrm/employees/check-duplicates-response", responseHandler);
+
+        // Emit duplicate check request
+        const requestData = {
+          email: formData.contact.email,
+          phone: formData.contact.phone,
+        };
+
+        console.log("=== FRONTEND: Emitting check-duplicates ===", requestData);
+
+        socket.emit("hrm/employees/check-duplicates", requestData);
+      });
+
+      const result = await checkDuplicates;
+      setIsValidating(false);
+
+      console.log("Check duplicates result:", result);
+
+      if (!result.done) {
+        // Duplicate found - backend returns field and error
+        const fieldName = result.field || "general";
+        const errorMessage = result.error || "Validation failed";
+
+        console.log("Setting field error:", fieldName, errorMessage);
+
+        // Use parseBackendError to get user-friendly message
+        const errorInfo = parseBackendError(errorMessage);
+
+        if (errorInfo && errorInfo.field !== "general") {
+          // Set error for specific field
+          setFieldErrors((prev) => ({
+            ...prev,
+            [errorInfo.field]: errorInfo.message,
+          }));
+
+          // Also show toast as backup
+          toast.error(errorInfo.message, {
+            position: "top-right",
+            autoClose: 5000,
+          });
+
+          // Scroll to error field
+          setTimeout(() => {
+            const errorElement =
+              document.querySelector(`[name="${errorInfo.field}"]`) ||
+              document.querySelector(`#${errorInfo.field}`) ||
+              document.querySelector(".is-invalid");
+            if (errorElement) {
+              errorElement.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+              (errorElement as HTMLElement).focus?.();
+            }
+          }, 100);
+        } else {
+          // General error
+          setFieldErrors({ general: errorMessage });
+          toast.error(errorMessage, {
+            position: "top-right",
+            autoClose: 5000,
+          });
+        }
+
+        return; // Don't proceed to next tab
+      }
+
+      // All validation passed - mark as validated and proceed to permissions tab
+      setIsBasicInfoValidated(true);
+      setActiveTab("address");
+    } catch (error: any) {
+      console.error("Validation error:", error);
+      setIsValidating(false);
+      if (error.message === "timeout") {
+        const errorMsg =
+          "Validation is taking longer than expected. Please check your connection and try again.";
+        setFieldErrors({ general: errorMsg });
+        toast.error(errorMsg, {
+          position: "top-right",
+          autoClose: 5000,
+        });
+      } else {
+        const errorMsg = "Unable to validate. Please try again.";
+        setFieldErrors({ general: errorMsg });
+        toast.error(errorMsg, {
+          position: "top-right",
+          autoClose: 5000,
+        });
+      }
+    }
   };
 
   const allPermissionsSelected = () => {
     return MODULES.every((module) =>
-      ACTIONS.every((action) => permissions.permissions[module][action])
+      ACTIONS.every((action) => permissions.permissions[module][action]),
     );
   };
   // incase of error (done:false)
@@ -2194,7 +2409,7 @@ const EmployeeList = () => {
                       <span className="avatar avatar-lg bg-info rounded-circle">
                         <i className="ti ti-user-plus" />
                       </span>
-                    </div> 
+                    </div>
                     <div className="ms-2 overflow-hidden">
                       <p className="fs-12 fw-medium mb-1 text-truncate">
                         New Joiners
@@ -2239,7 +2454,7 @@ const EmployeeList = () => {
                     {selectedDepartment
                       ? `: ${
                           department.find(
-                            (dep) => dep.value === selectedDepartment
+                            (dep) => dep.value === selectedDepartment,
                           )?.label || "None"
                         }`
                       : ": None"}
@@ -2252,7 +2467,9 @@ const EmployeeList = () => {
                           <Link
                             to="#"
                             className={`dropdown-item rounded-1${
-                              selectedDepartment === dep.value ? " bg-primary text-white" : ""
+                              selectedDepartment === dep.value
+                                ? " bg-primary text-white"
+                                : ""
                             }`}
                             onClick={(e) => {
                               e.preventDefault();
@@ -2275,10 +2492,7 @@ const EmployeeList = () => {
                   >
                     Select status{" "}
                     {selectedStatus
-                      ? `: ${
-                          selectedStatus.charAt(0).toUpperCase() +
-                          selectedStatus.slice(1)
-                        }`
+                      ? `: ${normalizeStatus(selectedStatus)}`
                       : ": None"}
                   </a>
                   <ul className="dropdown-menu  dropdown-menu-end p-3">
@@ -2291,24 +2505,17 @@ const EmployeeList = () => {
                         All
                       </Link>
                     </li>
-                    <li>
-                      <Link
-                        to="#"
-                        className="dropdown-item rounded-1"
-                        onClick={() => onSelectStatus("Active")}
-                      >
-                        Active
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        to="#"
-                        className="dropdown-item rounded-1"
-                        onClick={() => onSelectStatus("Inactive")}
-                      >
-                        Inactive
-                      </Link>
-                    </li>
+                    {availableStatusFilters.map((statusOption) => (
+                      <li key={statusOption.value}>
+                        <Link
+                          to="#"
+                          className="dropdown-item rounded-1"
+                          onClick={() => onSelectStatus(statusOption.value)}
+                        >
+                          {statusOption.text}
+                        </Link>
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div className="dropdown me-3">
@@ -2380,177 +2587,221 @@ const EmployeeList = () => {
             ) : (
               // GRID VIEW
               <div className="card-body p-0">
-              {/* Clients Grid */}
-              <div className="row mt-4">
-                {employees.length === 0 ? (
-                  <p className="text-center">No employees found</p>
-                ) : (
-                  employees.map((emp) => {
-                    const {
-                      _id,
-                      firstName,
-                      lastName,
-                      role,
-                      employeeId,
-                      contact,
-                      departmentId,
-                      status,
-                      avatarUrl,
-                    } = emp;
+                {/* Clients Grid */}
+                <div className="row mt-4">
+                  {employees.length === 0 ? (
+                    <p className="text-center">No employees found</p>
+                  ) : (
+                    employees.map((emp) => {
+                      const {
+                        _id,
+                        firstName,
+                        lastName,
+                        role,
+                        employeeId,
+                        contact,
+                        departmentId,
+                        status,
+                        avatarUrl,
+                      } = emp;
 
-                    const fullName =
-                      `${firstName || ""} ${lastName || ""}`.trim() ||
-                      "Unknown Name";
+                      const fullName =
+                        `${firstName || ""} ${lastName || ""}`.trim() ||
+                        "Unknown Name";
 
-                    return (
-                      <div key={_id} className="col-xl-3 col-lg-4 col-md-6 mb-4">
-                        <div className="card">
-                          <div className="card-body">
-                            <div className="d-flex justify-content-between align-items-start mb-2">
-                              <div className="form-check form-check-md">
-                                <input
-                                  className="form-check-input"
-                                  type="checkbox"
-                                />
-                              </div>
-                              <div>
-                                <Link
-                                  to={`${all_routes.employeedetails}/${_id}`}
-                                  className={`avatar avatar-xl avatar-rounded border p-1 border-primary rounded-circle ${
-                                    emp.status === "Active"
-                                      ? "online"
-                                      : "offline" // or "inactive"
-                                  }`}
-                                >
-                                  <img
-                                    src={
-                                      avatarUrl || "assets/img/users/user-32.jpg"
-                                    }
-                                    className="img-fluid"
-                                    alt={fullName}
+                      return (
+                        <div
+                          key={_id}
+                          className="col-xl-3 col-lg-4 col-md-6 mb-4"
+                        >
+                          <div className="card">
+                            <div className="card-body">
+                              <div className="d-flex justify-content-between align-items-start mb-2">
+                                <div className="form-check form-check-md">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
                                   />
-                                </Link>
-                              </div>
-                              <div className="dropdown">
-                                <button
-                                  className="btn btn-icon btn-sm rounded-circle bg-primary text-white"
-                                  type="button"
-                                  data-bs-toggle="dropdown"
-                                  aria-expanded="false"
-                                >
-                                  <i className="ti ti-dots-vertical" />
-                                </button>
-                                <ul className="dropdown-menu dropdown-menu-end p-3">
-                                  <li>
-                                    <Link
-                                      className="dropdown-item rounded-1"
-                                      to="#"
-                                      data-bs-toggle="modal"
-                                      data-inert={true}
-                                      data-bs-target="#edit_employee"
-                                      onClick={() => {
-                                        const preparedEmployee = prepareEmployeeForEdit(emp);
-                                        setEditingEmployee(preparedEmployee);
-                                        // Load permissions for editing
-                                        if (emp.permissions && emp.enabledModules) {
-                                          setPermissions({
-                                            permissions: emp.permissions,
-                                            enabledModules: emp.enabledModules,
-                                            selectAll: Object.keys(emp.enabledModules).reduce(
-                                              (acc, key) => {
-                                                acc[key as PermissionModule] = false;
-                                                return acc;
-                                              },
-                                              {} as Record<PermissionModule, boolean>
-                                            ),
-                                          });
-                                        }
-                                        // Load department and designation
-                                        if (emp.departmentId) {
-                                          setSelectedDepartment(emp.departmentId);
-                                          if (socket) {
-                                            socket.emit("hrm/designations/get", {
-                                              departmentId: emp.departmentId,
+                                </div>
+                                <div>
+                                  <Link
+                                    to={`${all_routes.employeedetails}/${_id}`}
+                                    className={`avatar avatar-xl avatar-rounded border p-1 border-primary rounded-circle ${
+                                      emp.status === "Active"
+                                        ? "online"
+                                        : "offline" // or "inactive"
+                                    }`}
+                                  >
+                                    <img
+                                      src={
+                                        avatarUrl ||
+                                        "assets/img/users/user-32.jpg"
+                                      }
+                                      className="img-fluid"
+                                      alt={fullName}
+                                    />
+                                  </Link>
+                                </div>
+                                <div className="dropdown">
+                                  <button
+                                    className="btn btn-icon btn-sm rounded-circle bg-primary text-white"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                  >
+                                    <i className="ti ti-dots-vertical" />
+                                  </button>
+                                  <ul className="dropdown-menu dropdown-menu-end p-3">
+                                    <li>
+                                      <Link
+                                        className="dropdown-item rounded-1"
+                                        to="#"
+                                        data-bs-toggle="modal"
+                                        data-inert={true}
+                                        data-bs-target="#edit_employee"
+                                        onClick={() => {
+                                          const preparedEmployee =
+                                            prepareEmployeeForEdit(emp);
+                                          setEditingEmployee(preparedEmployee);
+                                          // Load permissions for editing
+                                          if (
+                                            emp.permissions &&
+                                            emp.enabledModules
+                                          ) {
+                                            setPermissions({
+                                              permissions: emp.permissions,
+                                              enabledModules:
+                                                emp.enabledModules,
+                                              selectAll: Object.keys(
+                                                emp.enabledModules,
+                                              ).reduce(
+                                                (acc, key) => {
+                                                  acc[key as PermissionModule] =
+                                                    false;
+                                                  return acc;
+                                                },
+                                                {} as Record<
+                                                  PermissionModule,
+                                                  boolean
+                                                >,
+                                              ),
                                             });
                                           }
-                                        }
-                                        if (emp.designationId) {
-                                          setSelectedDesignation(emp.designationId);
-                                        }
-                                      }}
-                                    >
-                                      <i className="ti ti-edit me-1" /> Edit
-                                    </Link>
-                                  </li>
-                                  <li>
-                                    <Link
-                                      className="dropdown-item rounded-1"
-                                      to="#"
-                                      data-bs-toggle="modal"
-                                      data-inert={true}
-                                      data-bs-target="#delete_modal"
-                                      onClick={() => setEmployeeToDelete(emp)}
-                                    >
-                                      <i className="ti ti-trash me-1" /> Delete
-                                    </Link>
-                                  </li>
-                                </ul>
+                                          // Load department and designation
+                                          if (emp.departmentId) {
+                                            setSelectedDepartment(
+                                              emp.departmentId,
+                                            );
+                                            if (socket) {
+                                              socket.emit(
+                                                "hrm/designations/get",
+                                                {
+                                                  departmentId:
+                                                    emp.departmentId,
+                                                },
+                                              );
+                                            }
+                                          }
+                                          if (emp.designationId) {
+                                            setSelectedDesignation(
+                                              emp.designationId,
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <i className="ti ti-edit me-1" /> Edit
+                                      </Link>
+                                    </li>
+                                    <li>
+                                      <Link
+                                        className="dropdown-item rounded-1"
+                                        to="#"
+                                        data-bs-toggle="modal"
+                                        data-inert={true}
+                                        data-bs-target="#delete_modal"
+                                        onClick={() => setEmployeeToDelete(emp)}
+                                      >
+                                        <i className="ti ti-trash me-1" />{" "}
+                                        Delete
+                                      </Link>
+                                    </li>
+                                  </ul>
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-center mb-3">
-                              <h6 className="mb-1">
-                                <Link to={`/employees/${emp._id}`}>
-                                  {fullName}
-                                </Link>
-                              </h6>
-                              <span className="badge bg-pink-transparent fs-10 fw-medium">
-                                {role || "employee"}
-                              </span>
-                            </div>
-                            {/* Employee Details */}
-                            <div className="mb-3">
-                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                <span className="text-muted fs-12">Emp ID</span>
-                                <span className="fw-medium fs-13">{employeeId || "-"}</span>
-                              </div>
-                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                <span className="text-muted fs-12">Email</span>
-                                <span className="fw-medium fs-13 text-truncate" style={{ maxWidth: "150px" }} title={contact?.email || "-"}>
-                                  {contact?.email || "-"}
+                              <div className="text-center mb-3">
+                                <h6 className="mb-1">
+                                  <Link to={`/employees/${emp._id}`}>
+                                    {fullName}
+                                  </Link>
+                                </h6>
+                                <span className="badge bg-pink-transparent fs-10 fw-medium">
+                                  {role || "employee"}
                                 </span>
                               </div>
-                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                <span className="text-muted fs-12">Phone</span>
-                                <span className="fw-medium fs-13">{contact?.phone || "-"}</span>
-                              </div>
-                              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                <span className="text-muted fs-12">Department</span>
-                                <span className="fw-medium fs-13">
-                                  {department.find((dep) => dep.value === departmentId)?.label || "-"}
-                                </span>
-                              </div>
-                              <div className="d-flex justify-content-between align-items-center">
-                                <span className="text-muted fs-12">Status</span>
-                                <span
-                                  className={`badge ${
-                                    status === "Active"
-                                      ? "badge-success"
-                                      : "badge-danger"
-                                  } d-inline-flex align-items-center badge-xs`}
-                                >
-                                  <i className="ti ti-point-filled me-1" />
-                                  {status}
-                                </span>
+                              {/* Employee Details */}
+                              <div className="mb-3">
+                                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                  <span className="text-muted fs-12">
+                                    Emp ID
+                                  </span>
+                                  <span className="fw-medium fs-13">
+                                    {employeeId || "-"}
+                                  </span>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                  <span className="text-muted fs-12">
+                                    Email
+                                  </span>
+                                  <span
+                                    className="fw-medium fs-13 text-truncate"
+                                    style={{ maxWidth: "150px" }}
+                                    title={contact?.email || "-"}
+                                  >
+                                    {contact?.email || "-"}
+                                  </span>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                  <span className="text-muted fs-12">
+                                    Phone
+                                  </span>
+                                  <span className="fw-medium fs-13">
+                                    {contact?.phone || "-"}
+                                  </span>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                  <span className="text-muted fs-12">
+                                    Department
+                                  </span>
+                                  <span className="fw-medium fs-13">
+                                    {department.find(
+                                      (dep) => dep.value === departmentId,
+                                    )?.label || "-"}
+                                  </span>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center">
+                                  <span className="text-muted fs-12">
+                                    Status
+                                  </span>
+                                  <span
+                                    className={`badge ${
+                                      status === "Active"
+                                        ? "badge-success"
+                                        : "badge-danger"
+                                    } d-inline-flex align-items-center badge-xs`}
+                                  >
+                                    <i className="ti ti-point-filled me-1" />
+                                    {status}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              {/* /Employee Grid */}
+                      );
+                    })
+                  )}
+                </div>
+                {/* /Employee Grid */}
               </div>
             )}
           </div>
@@ -2617,28 +2868,50 @@ const EmployeeList = () => {
                         // Prevent access to permissions tab until basic info is validated
                         if (!isBasicInfoValidated) {
                           e.preventDefault();
-                          toast.info("Please complete and validate basic information first", {
-                            position: "top-right",
-                            autoClose: 3000,
-                          });
+                          toast.info(
+                            "Please complete and validate basic information first",
+                            {
+                              position: "top-right",
+                              autoClose: 3000,
+                            },
+                          );
                           return;
                         }
-                        
+
                         // Check if basic info tab has any errors
-                        const basicInfoFields = ['firstName', 'lastName', 'email', 'userName', 'password', 'confirmPassword', 'phone', 'departmentId', 'designationId', 'dateOfJoining'];
-                        const hasBasicInfoErrors = basicInfoFields.some(field => fieldErrors[field]);
-                        
+                        const basicInfoFields = [
+                          "firstName",
+                          "lastName",
+                          "email",
+                          "role", // Changed from userName to role
+                          "phone",
+                          "departmentId",
+                          "designationId",
+                          "dateOfJoining",
+                        ];
+                        const hasBasicInfoErrors = basicInfoFields.some(
+                          (field) => fieldErrors[field],
+                        );
+
                         if (hasBasicInfoErrors) {
                           e.preventDefault();
                           // Scroll to first error field instead of toast
                           setTimeout(() => {
-                            const firstErrorField = basicInfoFields.find(field => fieldErrors[field]);
+                            const firstErrorField = basicInfoFields.find(
+                              (field) => fieldErrors[field],
+                            );
                             if (firstErrorField) {
-                              const errorElement = document.querySelector(`[name="${firstErrorField}"]`) || 
-                                                  document.querySelector(`#${firstErrorField}`) ||
-                                                  document.querySelector('.is-invalid');
+                              const errorElement =
+                                document.querySelector(
+                                  `[name="${firstErrorField}"]`,
+                                ) ||
+                                document.querySelector(`#${firstErrorField}`) ||
+                                document.querySelector(".is-invalid");
                               if (errorElement) {
-                                errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                errorElement.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "center",
+                                });
                                 (errorElement as HTMLElement).focus?.();
                               }
                             }
@@ -2693,7 +2966,9 @@ const EmployeeList = () => {
                           )}
                           <div className="profile-upload">
                             <div className="mb-2">
-                              <h6 className="mb-1">Upload Profile Image (Optional)</h6>
+                              <h6 className="mb-1">
+                                Upload Profile Image (Optional)
+                              </h6>
                               <p className="fs-12">
                                 Image should be below 4 mb
                               </p>
@@ -2743,15 +3018,19 @@ const EmployeeList = () => {
                           </label>
                           <input
                             type="text"
-                            className={`form-control ${fieldErrors.firstName ? 'is-invalid' : ''}`}
+                            className={`form-control ${fieldErrors.firstName ? "is-invalid" : ""}`}
                             name="firstName"
                             value={formData.firstName}
                             onChange={handleChange}
-                            onFocus={() => clearFieldError('firstName')}
-                            onBlur={(e) => handleFieldBlur('firstName', e.target.value)}
+                            onFocus={() => clearFieldError("firstName")}
+                            onBlur={(e) =>
+                              handleFieldBlur("firstName", e.target.value)
+                            }
                           />
                           {fieldErrors.firstName && (
-                            <div className="invalid-feedback d-block">{fieldErrors.firstName}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.firstName}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2762,15 +3041,19 @@ const EmployeeList = () => {
                           </label>
                           <input
                             type="text"
-                            className={`form-control ${fieldErrors.lastName ? 'is-invalid' : ''}`}
+                            className={`form-control ${fieldErrors.lastName ? "is-invalid" : ""}`}
                             name="lastName"
                             value={formData.lastName}
                             onChange={handleChange}
-                            onFocus={() => clearFieldError('lastName')}
-                            onBlur={(e) => handleFieldBlur('lastName', e.target.value)}
+                            onFocus={() => clearFieldError("lastName")}
+                            onBlur={(e) =>
+                              handleFieldBlur("lastName", e.target.value)
+                            }
                           />
                           {fieldErrors.lastName && (
-                            <div className="invalid-feedback d-block">{fieldErrors.lastName}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.lastName}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2794,7 +3077,7 @@ const EmployeeList = () => {
                           </label>
                           <div className="input-icon-end position-relative">
                             <DatePicker
-                              className={`form-control datetimepicker ${fieldErrors.dateOfJoining ? 'is-invalid' : ''}`}
+                              className={`form-control datetimepicker ${fieldErrors.dateOfJoining ? "is-invalid" : ""}`}
                               format={{
                                 format: "DD-MM-YYYY",
                                 type: "mask",
@@ -2803,10 +3086,10 @@ const EmployeeList = () => {
                               placeholder="DD-MM-YYYY"
                               name="dateOfJoining"
                               value={formData.dateOfJoining}
-                              onFocus={() => clearFieldError('dateOfJoining')}
+                              onFocus={() => clearFieldError("dateOfJoining")}
                               onChange={(date) => {
                                 handleDateChange(date);
-                                handleFieldBlur('dateOfJoining', date);
+                                handleFieldBlur("dateOfJoining", date);
                               }}
                             />
                             <span className="input-icon-addon">
@@ -2814,26 +3097,36 @@ const EmployeeList = () => {
                             </span>
                           </div>
                           {fieldErrors.dateOfJoining && (
-                            <div className="invalid-feedback d-block">{fieldErrors.dateOfJoining}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.dateOfJoining}
+                            </div>
                           )}
                         </div>
                       </div>
+                      {/* Role Dropdown - Replaced Username */}
                       <div className="col-md-6">
                         <div className="mb-3">
                           <label className="form-label">
-                            Username <span className="text-danger"> *</span>
+                            Role <span className="text-danger"> *</span>
                           </label>
-                          <input
-                            type="text"
-                            className={`form-control ${fieldErrors.userName ? 'is-invalid' : ''}`}
-                            name="userName"
-                            value={formData.account.userName}
+                          <select
+                            className={`form-control ${fieldErrors.role ? "is-invalid" : ""}`}
+                            name="role"
+                            value={formData.account.role || ""}
                             onChange={handleChange}
-                            onFocus={() => clearFieldError('userName')}
-                            onBlur={(e) => handleFieldBlur('userName', e.target.value)}
-                          />
-                          {fieldErrors.userName && (
-                            <div className="invalid-feedback d-block">{fieldErrors.userName}</div>
+                            onFocus={() => clearFieldError("role")}
+                            onBlur={(e) =>
+                              handleFieldBlur("role", e.target.value)
+                            }
+                          >
+                            <option value="">Select Role</option>
+                            <option value="HR">HR</option>
+                            <option value="Employee">Employee</option>
+                          </select>
+                          {fieldErrors.role && (
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.role}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2844,15 +3137,19 @@ const EmployeeList = () => {
                           </label>
                           <input
                             type="email"
-                            className={`form-control ${fieldErrors.email ? 'is-invalid' : ''}`}
+                            className={`form-control ${fieldErrors.email ? "is-invalid" : ""}`}
                             name="email"
                             value={formData.contact.email}
                             onChange={handleChange}
-                            onFocus={() => clearFieldError('email')}
-                            onBlur={(e) => handleFieldBlur('email', e.target.value)}
+                            onFocus={() => clearFieldError("email")}
+                            onBlur={(e) =>
+                              handleFieldBlur("email", e.target.value)
+                            }
                           />
                           {fieldErrors.email && (
-                            <div className="invalid-feedback d-block">{fieldErrors.email}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.email}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2862,10 +3159,10 @@ const EmployeeList = () => {
                             Gender <span className="text-danger"> *</span>
                           </label>
                           <select
-                            className={`form-control ${fieldErrors.gender ? 'is-invalid' : ''}`}
+                            className={`form-control ${fieldErrors.gender ? "is-invalid" : ""}`}
                             name="gender"
                             value={formData.personal?.gender || ""}
-                            onFocus={() => clearFieldError('gender')}
+                            onFocus={() => clearFieldError("gender")}
                             onChange={(e) => {
                               const value = e.target.value;
                               setFormData((prev) => ({
@@ -2875,7 +3172,7 @@ const EmployeeList = () => {
                                   gender: value,
                                 },
                               }));
-                              handleFieldBlur('gender', value);
+                              handleFieldBlur("gender", value);
                             }}
                           >
                             <option value="">Select Gender</option>
@@ -2884,7 +3181,9 @@ const EmployeeList = () => {
                             <option value="other">Other</option>
                           </select>
                           {fieldErrors.gender && (
-                            <div className="invalid-feedback d-block">{fieldErrors.gender}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.gender}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2895,7 +3194,7 @@ const EmployeeList = () => {
                           </label>
                           <div className="input-icon-end position-relative">
                             <DatePicker
-                              className={`form-control datetimepicker ${fieldErrors.birthday ? 'is-invalid' : ''}`}
+                              className={`form-control datetimepicker ${fieldErrors.birthday ? "is-invalid" : ""}`}
                               format="DD-MM-YYYY"
                               getPopupContainer={getModalContainer}
                               placeholder="DD-MM-YYYY"
@@ -2905,9 +3204,11 @@ const EmployeeList = () => {
                                   ? dayjs(formData.personal.birthday)
                                   : null
                               }
-                              onFocus={() => clearFieldError('birthday')}
+                              onFocus={() => clearFieldError("birthday")}
                               onChange={(date) => {
-                                const isoDate = date ? date.toDate().toISOString() : null;
+                                const isoDate = date
+                                  ? date.toDate().toISOString()
+                                  : null;
                                 setFormData((prev) => ({
                                   ...prev,
                                   personal: {
@@ -2915,7 +3216,7 @@ const EmployeeList = () => {
                                     birthday: isoDate,
                                   },
                                 }));
-                                handleFieldBlur('birthday', isoDate);
+                                handleFieldBlur("birthday", isoDate);
                               }}
                             />
                             <span className="input-icon-addon">
@@ -2923,7 +3224,9 @@ const EmployeeList = () => {
                             </span>
                           </div>
                           {fieldErrors.birthday && (
-                            <div className="invalid-feedback d-block">{fieldErrors.birthday}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.birthday}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -3043,79 +3346,7 @@ const EmployeeList = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="col-md-6">
-                        <div className="mb-3 ">
-                          <label className="form-label">
-                            Password <span className="text-danger"> *</span>
-                          </label>
-                          <div className="pass-group">
-                            <input
-                              type={
-                                passwordVisibility.password
-                                  ? "text"
-                                  : "password"
-                              }
-                              className={`pass-input form-control ${fieldErrors.password ? 'is-invalid' : ''}`}
-                              name="password"
-                              value={formData.account.password}
-                              onChange={handleChange}
-                              onFocus={() => clearFieldError('password')}
-                              onBlur={(e) => handleFieldBlur('password', e.target.value)}
-                            />
-                            <span
-                              className={`ti toggle-passwords ${
-                                passwordVisibility.password
-                                  ? "ti-eye"
-                                  : "ti-eye-off"
-                              }`}
-                              onClick={() =>
-                                togglePasswordVisibility("password")
-                              }
-                            ></span>
-                          </div>
-                          {fieldErrors.password && (
-                            <div className="invalid-feedback d-block">{fieldErrors.password}</div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="mb-3 ">
-                          <label className="form-label">
-                            Confirm Password{" "}
-                            <span className="text-danger"> *</span>
-                          </label>
-                          <div className="pass-group">
-                            <input
-                              type={
-                                passwordVisibility.confirmPassword
-                                  ? "text"
-                                  : "password"
-                              }
-                              className={`pass-input form-control ${fieldErrors.confirmPassword ? 'is-invalid' : ''}`}
-                              name="confirmPassword"
-                              value={confirmPassword}
-                              onChange={(e) =>
-                                setConfirmPassword(e.target.value)
-                              }
-                              onFocus={() => clearFieldError('confirmPassword')}
-                              onBlur={(e) => handleFieldBlur('confirmPassword', e.target.value)}
-                            />
-                            <span
-                              className={`ti toggle-passwords ${
-                                passwordVisibility.confirmPassword
-                                  ? "ti-eye"
-                                  : "ti-eye-off"
-                              }`}
-                              onClick={() =>
-                                togglePasswordVisibility("confirmPassword")
-                              }
-                            ></span>
-                          </div>
-                          {fieldErrors.confirmPassword && (
-                            <div className="invalid-feedback d-block">{fieldErrors.confirmPassword}</div>
-                          )}
-                        </div>
-                      </div>
+                      {/* REMOVED: Password and Confirm Password fields */}
                       <div className="col-md-6">
                         <div className="mb-3">
                           <label className="form-label">
@@ -3123,43 +3354,49 @@ const EmployeeList = () => {
                           </label>
                           <input
                             type="text"
-                            className={`form-control ${fieldErrors.phone ? 'is-invalid' : ''}`}
+                            className={`form-control ${fieldErrors.phone ? "is-invalid" : ""}`}
                             name="phone"
                             value={formData.contact.phone}
                             onChange={handleChange}
-                            onFocus={() => clearFieldError('phone')}
-                            onBlur={(e) => handleFieldBlur('phone', e.target.value)}
+                            onFocus={() => clearFieldError("phone")}
+                            onBlur={(e) =>
+                              handleFieldBlur("phone", e.target.value)
+                            }
                           />
                           {fieldErrors.phone && (
-                            <div className="invalid-feedback d-block">{fieldErrors.phone}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.phone}
+                            </div>
                           )}
                         </div>
                       </div>
                       <div className="col-md-6">
                         <div className="mb-3">
-                          <label className="form-label">Department <span className="text-danger">*</span></label>
+                          <label className="form-label">
+                            Department <span className="text-danger">*</span>
+                          </label>
                           <CommonSelect
-                            className={`select ${fieldErrors.departmentId ? 'is-invalid' : ''}`}
+                            className={`select ${fieldErrors.departmentId ? "is-invalid" : ""}`}
                             options={department}
                             defaultValue={EMPTY_OPTION}
                             onChange={(option) => {
                               if (option) {
                                 handleSelectChange(
                                   "departmentId",
-                                  option.value
+                                  option.value,
                                 );
                                 setSelectedDepartment(option.value);
-                                
+
                                 // Reset designation when department changes
                                 setDesignation([
                                   { value: "", label: "Select" },
                                 ]);
                                 handleSelectChange("designationId", "");
-                                
+
                                 // Clear errors for both department and designation
-                                clearFieldError('departmentId');
-                                clearFieldError('designationId');
-                                
+                                clearFieldError("departmentId");
+                                clearFieldError("designationId");
+
                                 // Fetch new designations for selected department
                                 if (socket) {
                                   socket.emit("hrm/designations/get", {
@@ -3179,33 +3416,35 @@ const EmployeeList = () => {
                             }}
                           />
                           {fieldErrors.departmentId && (
-                            <div className="invalid-feedback d-block">{fieldErrors.departmentId}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.departmentId}
+                            </div>
                           )}
                         </div>
                       </div>
                       <div className="col-md-6">
                         <div className="mb-3">
-                          <label className="form-label">Designation <span className="text-danger">*</span></label>
+                          <label className="form-label">
+                            Designation <span className="text-danger">*</span>
+                          </label>
                           <CommonSelect
-                            className={`select ${fieldErrors.designationId ? 'is-invalid' : ''}`}
+                            className={`select ${fieldErrors.designationId ? "is-invalid" : ""}`}
                             options={designation}
                             defaultValue={EMPTY_OPTION}
                             onChange={(option) => {
                               if (option) {
                                 handleSelectChange(
                                   "designationId",
-                                  option.value
+                                  option.value,
                                 );
-                                clearFieldError('designationId');
-                              } else {
-                                handleSelectChange("designationId", "");
-                                setSelectedDesignation("");
-                                clearFieldError('designationId');
+                                clearFieldError("designationId");
                               }
                             }}
                           />
                           {fieldErrors.designationId && (
-                            <div className="invalid-feedback d-block">{fieldErrors.designationId}</div>
+                            <div className="invalid-feedback d-block">
+                              {fieldErrors.designationId}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -3225,11 +3464,16 @@ const EmployeeList = () => {
                                 onChange={(e) =>
                                   setFormData((prev) => ({
                                     ...prev,
-                                    status: e.target.checked ? "Active" : "Inactive",
+                                    status: e.target.checked
+                                      ? "Active"
+                                      : "Inactive",
                                   }))
                                 }
                               />
-                              <label className="form-check-label" htmlFor="statusSwitch">
+                              <label
+                                className="form-check-label"
+                                htmlFor="statusSwitch"
+                              >
                                 <span
                                   className={`badge ${
                                     formData.status === "Active"
@@ -3283,7 +3527,11 @@ const EmployeeList = () => {
                     >
                       {isValidating ? (
                         <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
                           Validating...
                         </>
                       ) : (
@@ -3313,7 +3561,7 @@ const EmployeeList = () => {
                                 type="checkbox"
                                 role="switch"
                                 checked={Object.values(
-                                  permissions.enabledModules
+                                  permissions.enabledModules,
                                 ).every(Boolean)}
                                 onChange={(e) =>
                                   toggleAllModules(e.target.checked)
@@ -3328,7 +3576,7 @@ const EmployeeList = () => {
                                 className="form-check-input"
                                 type="checkbox"
                                 checked={Object.values(
-                                  permissions.selectAll
+                                  permissions.selectAll,
                                 ).every(Boolean)}
                                 onChange={(e) =>
                                   toggleGlobalSelectAll(e.target.checked)
@@ -3379,7 +3627,7 @@ const EmployeeList = () => {
                                           handlePermissionChange(
                                             module,
                                             action,
-                                            e.target.checked
+                                            e.target.checked,
                                           )
                                         }
                                         disabled={
@@ -3419,12 +3667,20 @@ const EmployeeList = () => {
                     >
                       {isValidating ? (
                         <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
                           Validating...
                         </>
                       ) : loading ? (
                         <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
                           Saving...
                         </>
                       ) : (
@@ -3546,7 +3802,7 @@ const EmployeeList = () => {
                                     const maxSize = 4 * 1024 * 1024;
                                     if (file.size > maxSize) {
                                       toast.error(
-                                        "File size must be less than 4MB."
+                                        "File size must be less than 4MB.",
                                       );
                                       event.target.value = "";
                                       return;
@@ -3564,11 +3820,11 @@ const EmployeeList = () => {
                                         formData.append("file", file);
                                         formData.append(
                                           "upload_preset",
-                                          "amasqis"
+                                          "amasqis",
                                         );
                                         const res = await fetch(
                                           "https://api.cloudinary.com/v1_1/dwc3b5zfe/image/upload",
-                                          { method: "POST", body: formData }
+                                          { method: "POST", body: formData },
                                         );
                                         const data = await res.json();
                                         setEditingEmployee((prev) =>
@@ -3577,17 +3833,17 @@ const EmployeeList = () => {
                                                 ...prev,
                                                 avatarUrl: data.secure_url,
                                               }
-                                            : prev
+                                            : prev,
                                         );
                                       } catch (error) {
                                         toast.error(
-                                          "Failed to upload image. Please try again."
+                                          "Failed to upload image. Please try again.",
                                         );
                                         event.target.value = "";
                                       }
                                     } else {
                                       toast.error(
-                                        "Please upload image file only."
+                                        "Please upload image file only.",
                                       );
                                       event.target.value = "";
                                     }
@@ -3608,7 +3864,7 @@ const EmployeeList = () => {
                                 className="btn btn-light btn-sm"
                                 onClick={() =>
                                   setEditingEmployee((prev) =>
-                                    prev ? { ...prev, avatarUrl: "" } : prev
+                                    prev ? { ...prev, avatarUrl: "" } : prev,
                                   )
                                 }
                               >
@@ -3632,11 +3888,9 @@ const EmployeeList = () => {
                               setEditingEmployee((prev) =>
                                 prev
                                   ? { ...prev, firstName: e.target.value }
-                                  : prev
-                              );
-                              clearFieldError('firstName');
-                            }}
-                            onBlur={(e) => handleFieldBlur('firstName', e.target.value)}
+                                  : prev,
+                              )
+                            }
                           />
                           {fieldErrors.firstName && (
                             <div className="invalid-feedback d-block">{fieldErrors.firstName}</div>
@@ -3655,11 +3909,9 @@ const EmployeeList = () => {
                               setEditingEmployee((prev) =>
                                 prev
                                   ? { ...prev, lastName: e.target.value }
-                                  : prev
-                              );
-                              clearFieldError('lastName');
-                            }}
-                            onBlur={(e) => handleFieldBlur('lastName', e.target.value)}
+                                  : prev,
+                              )
+                            }
                           />
                           {fieldErrors.lastName && (
                             <div className="invalid-feedback d-block">{fieldErrors.lastName}</div>
@@ -3705,7 +3957,7 @@ const EmployeeList = () => {
                                           ? date.toDate().toISOString()
                                           : "",
                                       }
-                                    : prev
+                                    : prev,
                                 );
                                 clearFieldError('dateOfJoining');
                               }}
@@ -3726,24 +3978,21 @@ const EmployeeList = () => {
                           </label>
                           <input
                             type="text"
-                            name="userName"
-                            className={`form-control ${fieldErrors.userName ? 'is-invalid' : ''}`}
-                            value={editingEmployee?.account?.userName || ""}
-                            onChange={(e) => {
+                            className="form-control"
+                            value={editingEmployee?.account?.role || ""}
+                            onChange={(e) =>
                               setEditingEmployee((prev) =>
                                 prev
                                   ? {
                                       ...prev,
                                       account: {
                                         ...prev.account,
-                                        userName: e.target.value,
+                                        role: e.target.value,
                                       },
                                     }
-                                  : prev
-                              );
-                              clearFieldError('userName');
-                            }}
-                            onBlur={(e) => handleFieldBlur('userName', e.target.value)}
+                                  : prev,
+                              )
+                            }
                           />
                           {fieldErrors.userName && (
                             <div className="invalid-feedback d-block">{fieldErrors.userName}</div>
@@ -3770,11 +4019,9 @@ const EmployeeList = () => {
                                         email: e.target.value,
                                       },
                                     }
-                                  : prev
-                              );
-                              clearFieldError('email');
-                            }}
-                            onBlur={(e) => handleFieldBlur('email', e.target.value)}
+                                  : prev,
+                              )
+                            }
                           />
                           {fieldErrors.email && (
                             <div className="invalid-feedback d-block">{fieldErrors.email}</div>
@@ -3799,7 +4046,7 @@ const EmployeeList = () => {
                                         gender: e.target.value,
                                       },
                                     }
-                                  : prev
+                                  : prev,
                               )
                             }
                           >
@@ -3838,7 +4085,7 @@ const EmployeeList = () => {
                                             : null,
                                         },
                                       }
-                                    : prev
+                                    : prev,
                                 )
                               }
                             />
@@ -3871,7 +4118,7 @@ const EmployeeList = () => {
                                         },
                                       },
                                     }
-                                  : prev
+                                  : prev,
                               )
                             }
                           />
@@ -3897,7 +4144,7 @@ const EmployeeList = () => {
                                             },
                                           },
                                         }
-                                      : prev
+                                      : prev,
                                   )
                                 }
                               />
@@ -3924,7 +4171,7 @@ const EmployeeList = () => {
                                             },
                                           },
                                         }
-                                      : prev
+                                      : prev,
                                   )
                                 }
                               />
@@ -3953,7 +4200,7 @@ const EmployeeList = () => {
                                             },
                                           },
                                         }
-                                      : prev
+                                      : prev,
                                   )
                                 }
                               />
@@ -3980,7 +4227,7 @@ const EmployeeList = () => {
                                             },
                                           },
                                         }
-                                      : prev
+                                      : prev,
                                   )
                                 }
                               />
@@ -4008,11 +4255,28 @@ const EmployeeList = () => {
                                         phone: e.target.value,
                                       },
                                     }
-                                  : prev
-                              );
-                              clearFieldError('phone');
-                            }}
-                            onBlur={(e) => handleFieldBlur('phone', e.target.value)}
+                                  : prev,
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="mb-3">
+                          <label className="form-label">
+                            Company<span className="text-danger"> *</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={editingEmployee?.companyName || ""}
+                            onChange={(e) =>
+                              setEditingEmployee((prev) =>
+                                prev
+                                  ? { ...prev, companyName: e.target.value }
+                                  : prev,
+                              )
+                            }
                           />
                           {fieldErrors.phone && (
                             <div className="invalid-feedback d-block">{fieldErrors.phone}</div>
@@ -4028,8 +4292,9 @@ const EmployeeList = () => {
                             options={department}
                             defaultValue={
                               department.find(
-                                (dep) => dep.value === editingEmployee?.departmentId
-                              ) || EMPTY_OPTION
+                                (dep) =>
+                                  dep.value === editingEmployee?.departmentId,
+                              ) || { value: "", label: "Select" }
                             }
                             onChange={(option) => {
                               if (option) {
@@ -4041,16 +4306,14 @@ const EmployeeList = () => {
                                         departmentId: option.value,
                                         designationId: "",
                                       }
-                                    : prev
+                                    : prev,
                                 );
                                 setSelectedDesignation("");
-                                // reset designation options when department changes
-                                setDesignation([{ value: "", label: "Select" }]);
-                                // clear related errors
-                                clearFieldError('departmentId');
-                                clearFieldError('designationId');
-                                // fetch designations for selected department
-                                if (socket) {
+                                if (socket && option.value) {
+                                  console.log(
+                                    "Fetching designations for department:",
+                                    option.value,
+                                  );
                                   socket.emit("hrm/designations/get", {
                                     departmentId: option.value,
                                   });
@@ -4084,8 +4347,9 @@ const EmployeeList = () => {
                             options={designation}
                             defaultValue={
                               designation.find(
-                                (dep) => dep.value === editingEmployee?.designationId
-                              ) || EMPTY_OPTION
+                                (dep) =>
+                                  dep.value === editingEmployee?.designationId,
+                              ) || { value: "", label: "Select" }
                             }
                             onChange={(option) => {
                               if (option) {
@@ -4093,7 +4357,7 @@ const EmployeeList = () => {
                                 setEditingEmployee((prev) =>
                                   prev
                                     ? { ...prev, designationId: option.value }
-                                    : prev
+                                    : prev,
                                 );
                                 clearFieldError('designationId');
                               } else {
@@ -4143,7 +4407,9 @@ const EmployeeList = () => {
                                     prev
                                       ? {
                                           ...prev,
-                                          status: e.target.checked ? "Active" : "Inactive",
+                                          status: e.target.checked
+                                            ? "Active"
+                                            : "Inactive",
                                         }
                                       : prev
                                   );
@@ -4185,7 +4451,9 @@ const EmployeeList = () => {
                             value={editingEmployee?.about || ""}
                             onChange={(e) =>
                               setEditingEmployee((prev) =>
-                                prev ? { ...prev, about: e.target.value } : prev
+                                prev
+                                  ? { ...prev, about: e.target.value }
+                                  : prev,
                               )
                             }
                           />
@@ -4231,7 +4499,7 @@ const EmployeeList = () => {
                               type="checkbox"
                               role="switch"
                               checked={Object.values(
-                                permissions.enabledModules
+                                permissions.enabledModules,
                               ).every(Boolean)} // all enabled
                               onChange={() => toggleAllModules(true)} // implement this to toggle all modules
                             />
@@ -4302,7 +4570,7 @@ const EmployeeList = () => {
                                         handlePermissionChange(
                                           module,
                                           action,
-                                          e.target.checked
+                                          e.target.checked,
                                         )
                                       }
                                       disabled={
@@ -4395,7 +4663,7 @@ const EmployeeList = () => {
         </div>
       </div>
       {/* /Add Client Success */}
-      
+
       {/* Employee Added Success Modal */}
       <div className="modal fade" id="employee_success_modal">
         <div className="modal-dialog modal-dialog-centered">
@@ -4407,7 +4675,7 @@ const EmployeeList = () => {
               <h4 className="mb-1">Employee Added Successfully!</h4>
               <p className="mb-3">
                 {newlyAddedEmployee
-                  ? `${newlyAddedEmployee.firstName || ''} ${newlyAddedEmployee.lastName || ''} has been added to the system.`
+                  ? `${newlyAddedEmployee.firstName || ""} ${newlyAddedEmployee.lastName || ""} has been added to the system.`
                   : "The employee has been added successfully."}
               </p>
               <div className="d-flex justify-content-center gap-2">
@@ -4427,7 +4695,9 @@ const EmployeeList = () => {
                   data-bs-dismiss="modal"
                   onClick={() => {
                     if (newlyAddedEmployee && newlyAddedEmployee._id) {
-                      navigate(`${all_routes.employeedetails}/${newlyAddedEmployee._id}`);
+                      navigate(
+                        `${all_routes.employeedetails}/${newlyAddedEmployee._id}`,
+                      );
                     }
                     setNewlyAddedEmployee(null);
                     setTimeout(() => closeModal(), 100);
@@ -4448,7 +4718,7 @@ const EmployeeList = () => {
         data-bs-target="#employee_success_modal"
         style={{ display: "none" }}
       />
-      
+
       <div className="modal fade" id="delete_modal">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content">
