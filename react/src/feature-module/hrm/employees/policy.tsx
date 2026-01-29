@@ -1,39 +1,19 @@
-import React, { useState, useEffect } from 'react'
-import { all_routes } from '../../router/all_routes'
-import { Link } from 'react-router-dom'
+import { DatePicker, message } from 'antd';
+import dayjs from 'dayjs';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { DateTime } from 'luxon';
+
 import Table from "../../../core/common/dataTable/index";
 import CommonSelect from '../../../core/common/commonSelect';
 import PredefinedDateRanges from '../../../core/common/datePicker';
 import CollapseHeader from '../../../core/common/collapse-header/collapse-header';
-import { usePoliciesREST } from "../../../hooks/usePoliciesREST";
+import Footer from "../../../core/common/footer";
+import { usePoliciesREST, Policy as PolicyType, PolicyAssignment } from "../../../hooks/usePoliciesREST";
 import { useDepartmentsREST } from "../../../hooks/useDepartmentsREST";
 import { useDesignationsREST } from "../../../hooks/useDesignationsREST";
-import { DateTime } from 'luxon';
-import Footer from "../../../core/common/footer";
 import { hideModal } from '../../../utils/modalUtils';
-import { DatePicker } from "antd";
-import dayjs from "dayjs";
-import { message } from 'antd';
-
-// Policy Assignment Structure (ONLY ObjectIds)
-interface PolicyAssignment {
-  departmentId: string;  // Department ObjectId as string
-  designationIds: string[];  // Array of Designation ObjectIds as strings (empty = all designations)
-}
-
-// Display structure with names (for frontend display only)
-interface PolicyAssignmentWithNames extends PolicyAssignment {
-  departmentName: string;  // Populated by backend for display
-}
-
-interface Policy {
-  _id: string,
-  policyName: string;
-  policyDescription: string;
-  effectiveDate: string;
-  applyToAll?: boolean;  // When true, policy applies to all current and future employees
-  assignTo?: PolicyAssignmentWithNames[];  // Backend populates with names for display
-}
+import { all_routes } from '../../router/all_routes';
 
 interface Department {
   _id: string;
@@ -61,36 +41,36 @@ const staticOptions = [
 
 const Policy = () => {
   // Local state for UI and form management only
-  const [sortedPolicies, setSortedPolicies] = useState<Policy[]>([]);
+  const [sortedPolicies, setSortedPolicies] = useState<PolicyType[]>([]);
   const [sortOrder, setSortOrder] = useState("");
-  const [policyName, setPolicyName] = useState("");
+  const [policyName, setPolicyTypeName] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [description, setDescription] = useState("");
-  const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
+  const [editingPolicyType, setEditingPolicyType] = useState<PolicyType | null>(null);
   const [filters, setFilters] = useState({ department: "", startDate: "", endDate: "" });
-  const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
+  const [policyToDelete, setPolicyTypeToDelete] = useState<PolicyType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState(staticOptions[0].value);
   const [selectedFilterDepartment, setSelectedFilterDepartment] = useState<string>("");
   
-  // Policy Assignment State - Hierarchical toggle-based structure
+  // PolicyType Assignment State - Hierarchical toggle-based structure
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);  // Array of department IDs where toggle is ON
   const [selectedDesignations, setSelectedDesignations] = useState<{[departmentId: string]: string[]}>({});  // Map: deptId -> designationIds[]
   const [applyToAll, setApplyToAll] = useState<boolean>(false);
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());  // Track which departments are expanded
   
   // State for viewing policy details
-  const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null);
+  const [viewingPolicyType, setViewingPolicyType] = useState<PolicyType | null>(null);
 
-  // Validation error states for Add Policy modal
-  const [policyNameError, setPolicyNameError] = useState<string | null>(null);
+  // Validation error states for Add PolicyType modal
+  const [policyNameError, setPolicyTypeNameError] = useState<string | null>(null);
   const [effectiveDateError, setEffectiveDateError] = useState<string | null>(null);
   const [applyToError, setApplyToError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
-  // Validation error states for Edit Policy modal
-  const [editPolicyNameError, setEditPolicyNameError] = useState<string | null>(null);
+  // Validation error states for Edit PolicyType modal
+  const [editPolicyTypeNameError, setEditPolicyTypeNameError] = useState<string | null>(null);
   const [editEffectiveDateError, setEditEffectiveDateError] = useState<string | null>(null);
   const [editApplyToError, setEditApplyToError] = useState<string | null>(null);
   const [editDescriptionError, setEditDescriptionError] = useState<string | null>(null);
@@ -166,11 +146,11 @@ const Policy = () => {
     {
       title: "Name",
       dataIndex: "policyName",
-      render: (text: String, record: Policy) => (
+      render: (text: String, record: PolicyType) => (
         <h6 
           className="fw-medium fs-14 text-dark" 
           style={{ cursor: 'pointer' }}
-          onClick={() => setViewingPolicy(record)}
+          onClick={() => setViewingPolicyType(record)}
           data-bs-toggle="modal"
           data-bs-target="#view_policy"
         >
@@ -182,7 +162,7 @@ const Policy = () => {
     {
       title: "Assign To",
       dataIndex: "assignTo",
-      render: (assignTo: PolicyAssignmentWithNames[], record: Policy) => {
+      render: (assignTo: PolicyAssignment[], record: PolicyType) => {
         // Check if policy applies to all employees
         if (record.applyToAll) {
           return (
@@ -195,16 +175,16 @@ const Policy = () => {
         if (!assignTo || assignTo.length === 0) {
           return <span className="text-muted">Not assigned</span>;
         }
-        
+
         // Display departments
         const deptDisplay = assignTo.map(a => {
-          const deptName = a.departmentName || "Unknown";
+          const deptName = a.departmentName || getDepartmentName(a.departmentId);
           const hasDesignations = a.designationIds && a.designationIds.length > 0;
-          return hasDesignations 
-            ? `${deptName} (${a.designationIds.length} designations)` 
+          return hasDesignations
+            ? `${deptName} (${a.designationIds.length} designations)`
             : `${deptName} (All designations)`;
         }).join(", ");
-        
+
         return (
           <h6 className="fw-normal fs-14 text-dark" title={deptDisplay}>
             {deptDisplay.length > 50 ? `${deptDisplay.substring(0, 50)}...` : deptDisplay}
@@ -249,7 +229,7 @@ const Policy = () => {
     {
       title: "",
       dataIndex: "actions",
-      render: (_test: any, policy: Policy) => (
+      render: (_test: any, policy: PolicyType) => (
         <div className="action-icon d-inline-flex">
           <Link
             to="#"
@@ -257,7 +237,7 @@ const Policy = () => {
             data-bs-toggle="modal"
             data-inert={true}
             data-bs-target="#view_policy"
-            onClick={() => setViewingPolicy(policy)}
+            onClick={() => setViewingPolicyType(policy)}
           >
             <i className="ti ti-eye" />
           </Link>
@@ -268,7 +248,7 @@ const Policy = () => {
             data-inert={true}
             data-bs-target="#edit_policy"
             onClick={() => { 
-              setEditingPolicy(policy);
+              setEditingPolicyType(policy);
               setApplyToAll(policy.applyToAll || false);
               
               // Initialize from policy assignTo with hierarchical logic
@@ -307,7 +287,7 @@ const Policy = () => {
             data-bs-toggle="modal"
             data-inert={true}
             data-bs-target="#delete_modal"
-            onClick={() => { setPolicyToDelete(policy); }}
+            onClick={() => { setPolicyTypeToDelete(policy); }}
           >
             <i className="ti ti-trash" />
           </Link>
@@ -331,12 +311,12 @@ const Policy = () => {
   ) => {
     // Clear all errors first
     if (isEditMode) {
-      setEditPolicyNameError(null);
+      setEditPolicyTypeNameError(null);
       setEditEffectiveDateError(null);
       setEditApplyToError(null);
       setEditDescriptionError(null);
     } else {
-      setPolicyNameError(null);
+      setPolicyTypeNameError(null);
       setEffectiveDateError(null);
       setApplyToError(null);
       setDescriptionError(null);
@@ -348,9 +328,9 @@ const Policy = () => {
     // Map backend errors to specific fields
     if (error.includes("policy name") || error.includes("policyname")) {
       if (isEditMode) {
-        setEditPolicyNameError(errorMessage);
+        setEditPolicyTypeNameError(errorMessage);
       } else {
-        setPolicyNameError(errorMessage);
+        setPolicyTypeNameError(errorMessage);
       }
     } else if (error.includes("effective date") || error.includes("effectivedate") || 
                error.includes("in-effect date") || error.includes("date") ||
@@ -390,9 +370,9 @@ const Policy = () => {
     return selectedDate >= today;
   };
 
-  // Reset Add Policy form fields and errors
-  const resetAddPolicyForm = () => {
-    setPolicyName("");
+  // Reset Add PolicyType form fields and errors
+  const resetAddPolicyTypeForm = () => {
+    setPolicyTypeName("");
     setEffectiveDate("");
     setDescription("");
     setSelectedDepartment(staticOptions[0].value);
@@ -401,16 +381,16 @@ const Policy = () => {
     setApplyToAll(false);
     setExpandedDepartments(new Set());
     setError(null);
-    setPolicyNameError(null);
+    setPolicyTypeNameError(null);
     setEffectiveDateError(null);
     setApplyToError(null);
     setDescriptionError(null);
   };
 
-  // Reset Edit Policy validation errors
-  const resetEditPolicyForm = () => {
+  // Reset Edit PolicyType validation errors
+  const resetEditPolicyTypeForm = () => {
     setError(null);
-    setEditPolicyNameError(null);
+    setEditPolicyTypeNameError(null);
     setEditEffectiveDateError(null);
     setEditApplyToError(null);
     setEditDescriptionError(null);
@@ -533,7 +513,7 @@ const Policy = () => {
   const handleSubmit = async () => {
     try {
       // Clear all errors at the start
-      setPolicyNameError(null);
+      setPolicyTypeNameError(null);
       setEffectiveDateError(null);
       setApplyToError(null);
       setDescriptionError(null);
@@ -543,7 +523,7 @@ const Policy = () => {
       let hasError = false;
 
       if (!policyName.trim()) {
-        setPolicyNameError("Policy Name is required");
+        setPolicyTypeNameError("PolicyType Name is required");
         hasError = true;
       }
 
@@ -621,7 +601,7 @@ const Policy = () => {
         // Close modal after successful response
         hideModal('add_policy');
         // Reset form after successful submission
-        resetAddPolicyForm();
+        resetAddPolicyTypeForm();
       }
       setLoading(false);
     } catch (error) {
@@ -699,16 +679,16 @@ const Policy = () => {
     setSortedPolicies(sortedData);
   };
 
-  const handleUpdateSubmit = async (editingPolicy: Policy) => {
+  const handleUpdateSubmit = async (editingPolicyType: PolicyType) => {
     try {
       // Clear all errors at the start
-      setEditPolicyNameError(null);
+      setEditPolicyTypeNameError(null);
       setEditEffectiveDateError(null);
       setEditApplyToError(null);
       setEditDescriptionError(null);
       setError(null);
 
-      const { _id, policyName, effectiveDate, policyDescription } = editingPolicy;
+      const { _id, policyName, effectiveDate, policyDescription } = editingPolicyType;
 
       if (!_id) {
         setError("Id not found");
@@ -719,7 +699,7 @@ const Policy = () => {
       let hasError = false;
 
       if (!policyName || !policyName.trim()) {
-        setEditPolicyNameError("Policy Name is required");
+        setEditPolicyTypeNameError("PolicyType Name is required");
         hasError = true;
       }
 
@@ -797,7 +777,7 @@ const Policy = () => {
         // Close modal after successful response
         hideModal('edit_policy');
         // Reset validation errors after successful submission
-        resetEditPolicyForm();
+        resetEditPolicyTypeForm();
       }
       setLoading(false);
     } catch (error) {
@@ -816,7 +796,7 @@ const Policy = () => {
       setError(null);
 
       if (!policyId) {
-        setError("Policy ID is required");
+        setError("PolicyType ID is required");
         setLoading(false);
         return;
       }
@@ -949,10 +929,10 @@ const Policy = () => {
                   data-inert={true}
                   data-bs-target="#add_policy"
                   className="btn btn-primary d-flex align-items-center"
-                  onClick={resetAddPolicyForm}
+                  onClick={resetAddPolicyTypeForm}
                 >
                   <i className="ti ti-circle-plus me-2" />
-                  Add Policy
+                  Add PolicyType
                 </Link>
               </div>
               <div className="head-icons ms-2">
@@ -962,7 +942,7 @@ const Policy = () => {
           </div>
           {/* /Breadcrumb */}
           
-          {/* Policy Stats Cards */}
+          {/* PolicyType Stats Cards */}
           <div className="row">
             <div className="col-xl-3 col-sm-6 col-12 d-flex">
               <div className="card bg-comman w-100">
@@ -1033,9 +1013,9 @@ const Policy = () => {
               </div>
             </div>
           </div>
-          {/* /Policy Stats Cards */}
+          {/* /PolicyType Stats Cards */}
           
-          {/* Policy list */}
+          {/* PolicyType list */}
           <div className="card">
             <div className="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
               <h5>Policies List</h5>
@@ -1119,23 +1099,23 @@ const Policy = () => {
               <Table dataSource={policiesWithKey} columns={columns} Selection={true} />
             </div>
           </div>
-          {/* /Policylist list */}
+          {/* /PolicyTypelist list */}
         </div>
         <Footer />
       </div>
       {/* /Page Wrapper */}
-      {/* Add Policy */}
+      {/* Add PolicyType */}
       <div className="modal fade" id="add_policy">
         <div className="modal-dialog modal-dialog-centered modal-lg">
           <div className="modal-content">
             <div className="modal-header">
-              <h4 className="modal-title">Add Policy</h4>
+              <h4 className="modal-title">Add PolicyType</h4>
               <button
                 type="button"
                 className="btn-close custom-btn-close"
                 data-bs-dismiss="modal"
                 aria-label="Close"
-                onClick={resetAddPolicyForm}
+                onClick={resetAddPolicyTypeForm}
               >
                 <i className="ti ti-x" />
               </button>
@@ -1146,17 +1126,17 @@ const Policy = () => {
                   <div className="col-md-12">
                     <div className="mb-3">
                       <label className="form-label">
-                        Policy Name <span className="text-danger">*</span>
+                        PolicyType Name <span className="text-danger">*</span>
                       </label>
                       <input 
                         type="text" 
                         className={`form-control ${policyNameError ? 'is-invalid' : ''}`}
                         value={policyName} 
                         onChange={(e) => {
-                          setPolicyName(e.target.value);
+                          setPolicyTypeName(e.target.value);
                           // Clear error when user starts typing
                           if (policyNameError) {
-                            setPolicyNameError(null);
+                            setPolicyTypeNameError(null);
                           }
                         }} 
                       />
@@ -1361,7 +1341,7 @@ const Policy = () => {
                   <div className="col-md-12">
                     <div className="mb-3">
                       <label className="form-label">
-                        Policy Description <span className="text-danger">*</span>
+                        PolicyType Description <span className="text-danger">*</span>
                       </label>
                       <div className="policy-description-container">
                         <textarea
@@ -1398,7 +1378,7 @@ const Policy = () => {
                   type="button"
                   className="btn btn-white border me-2"
                   data-bs-dismiss="modal"
-                  onClick={resetAddPolicyForm}
+                  onClick={resetAddPolicyTypeForm}
                 >
                   Cancel
                 </button>
@@ -1408,26 +1388,26 @@ const Policy = () => {
                   disabled={loading} 
                   onClick={handleSubmit}
                 >
-                  Add Policy
+                  Add PolicyType
                 </button>
               </div>
             </form>
           </div>
         </div>
       </div>
-      {/* /Add Policy */}
-      {/* Edit  Policy */}
+      {/* /Add PolicyType */}
+      {/* Edit  PolicyType */}
       <div className="modal fade" id="edit_policy">
         <div className="modal-dialog modal-dialog-centered modal-lg">
           <div className="modal-content">
             <div className="modal-header">
-              <h4 className="modal-title">Edit Policy</h4>
+              <h4 className="modal-title">Edit PolicyType</h4>
               <button
                 type="button"
                 className="btn-close custom-btn-close"
                 data-bs-dismiss="modal"
                 aria-label="Close"
-                onClick={resetEditPolicyForm}
+                onClick={resetEditPolicyTypeForm}
               >
                 <i className="ti ti-x" />
               </button>
@@ -1438,24 +1418,24 @@ const Policy = () => {
                   <div className="col-md-12">
                     <div className="mb-3">
                       <label className="form-label">
-                        Policy Name <span className="text-danger">*</span>
+                        PolicyType Name <span className="text-danger">*</span>
                       </label>
                       <input
                         type="text"
-                        className={`form-control ${editPolicyNameError ? 'is-invalid' : ''}`}
-                        value={editingPolicy?.policyName || ""}
+                        className={`form-control ${editPolicyTypeNameError ? 'is-invalid' : ''}`}
+                        value={editingPolicyType?.policyName || ""}
                         onChange={(e) => {
-                          setEditingPolicy(prev =>
+                          setEditingPolicyType(prev =>
                             prev ? { ...prev, policyName: e.target.value } : prev);
                           // Clear error when user starts typing
-                          if (editPolicyNameError) {
-                            setEditPolicyNameError(null);
+                          if (editPolicyTypeNameError) {
+                            setEditPolicyTypeNameError(null);
                           }
                         }}
                       />
-                      {editPolicyNameError && (
+                      {editPolicyTypeNameError && (
                         <div className="invalid-feedback d-block">
-                          {editPolicyNameError}
+                          {editPolicyTypeNameError}
                         </div>
                       )}
                     </div>
@@ -1471,10 +1451,10 @@ const Policy = () => {
                           format="DD-MM-YYYY"
                           getPopupContainer={getModalContainer}
                           placeholder="DD-MM-YYYY"
-                          value={editingPolicy?.effectiveDate ? dayjs(editingPolicy.effectiveDate) : null}
+                          value={editingPolicyType?.effectiveDate ? dayjs(editingPolicyType.effectiveDate) : null}
                           onChange={(date) => {
                             const isoDate = date ? date.toDate().toISOString() : "";
-                            setEditingPolicy(prev =>
+                            setEditingPolicyType(prev =>
                               prev ? { ...prev, effectiveDate: isoDate } : prev);
                             // Clear error when user selects a date
                             if (editEffectiveDateError) {
@@ -1655,16 +1635,16 @@ const Policy = () => {
                   <div className="col-md-12">
                     <div className="mb-3">
                       <label className="form-label">
-                        Policy Description <span className="text-danger">*</span>
+                        PolicyType Description <span className="text-danger">*</span>
                       </label>
                       <div className="policy-description-container">
                         <textarea
                           className={`form-control ${editDescriptionError ? 'is-invalid' : ''}`}
                           rows={4}
                           placeholder="Enter policy details and description here..."
-                          value={editingPolicy?.policyDescription || ""}
+                          value={editingPolicyType?.policyDescription || ""}
                           onChange={(e) => {
-                            setEditingPolicy(prev =>
+                            setEditingPolicyType(prev =>
                               prev ? { ...prev, policyDescription: e.target.value } : prev
                             );
                             // Clear error when user starts typing
@@ -1689,7 +1669,7 @@ const Policy = () => {
                   type="button"
                   className="btn btn-white border me-2"
                   data-bs-dismiss="modal"
-                  onClick={resetEditPolicyForm}
+                  onClick={resetEditPolicyTypeForm}
                 >
                   Cancel
                 </button>
@@ -1697,20 +1677,20 @@ const Policy = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
-                    if (editingPolicy) {
-                      handleUpdateSubmit(editingPolicy);
+                    if (editingPolicyType) {
+                      handleUpdateSubmit(editingPolicyType);
                     }
                   }}
-                  disabled={!editingPolicy || loading}
+                  disabled={!editingPolicyType || loading}
                 >
-                  {loading ? 'Saving...' : 'Update Policy'}
+                  {loading ? 'Saving...' : 'Update PolicyType'}
                 </button>
               </div>
             </form>
           </div>
         </div >
       </div >
-      {/* /Edit  Policy */}
+      {/* /Edit  PolicyType */}
       {/* delete policy*/}
       <div className="modal fade" id="delete_modal">
         <div className="modal-dialog modal-dialog-centered">
@@ -1729,7 +1709,7 @@ const Policy = () => {
                 <button
                   className="btn btn-light me-3"
                   data-bs-dismiss="modal"
-                  onClick={() => setPolicyToDelete(null)}
+                  onClick={() => setPolicyTypeToDelete(null)}
                   disabled={loading}
                 >
                   Cancel
@@ -1741,7 +1721,7 @@ const Policy = () => {
                     if (policyToDelete) {
                       await deletePolicyById(policyToDelete._id);
                     }
-                    setPolicyToDelete(null);
+                    setPolicyTypeToDelete(null);
                   }}
                   disabled={loading}
                 >
@@ -1753,12 +1733,12 @@ const Policy = () => {
         </div>
       </div>
       {/*delete policy*/}
-      {/* View Policy */}
+      {/* View PolicyType */}
       <div className="modal fade" id="view_policy">
         <div className="modal-dialog modal-dialog-centered modal-lg">
           <div className="modal-content">
             <div className="modal-header">
-              <h4 className="modal-title">Policy Details</h4>
+              <h4 className="modal-title">PolicyType Details</h4>
               <button
                 type="button"
                 className="btn-close custom-btn-close"
@@ -1769,16 +1749,16 @@ const Policy = () => {
               </button>
             </div>
             <div className="modal-body">
-              {viewingPolicy && (
+              {viewingPolicyType && (
                 <div className="policy-details-container">
-                  {/* Policy Name */}
+                  {/* PolicyType Name */}
                   <div className="mb-4">
                     <div className="d-flex align-items-center mb-2">
                       <i className="ti ti-file-text text-primary me-2 fs-20"></i>
-                      <h5 className="mb-0 text-muted">Policy Name</h5>
+                      <h5 className="mb-0 text-muted">PolicyType Name</h5>
                     </div>
                     <div className="ps-4">
-                      <p className="fs-16 mb-0">{viewingPolicy.policyName}</p>
+                      <p className="fs-16 mb-0">{viewingPolicyType.policyName}</p>
                     </div>
                   </div>
 
@@ -1790,7 +1770,7 @@ const Policy = () => {
                     </div>
                     <div className="ps-4">
                       <p className="fs-16 mb-0">
-                        {DateTime.fromISO(viewingPolicy.effectiveDate).toFormat("dd MMMM yyyy")}
+                        {DateTime.fromISO(viewingPolicyType.effectiveDate).toFormat("dd MMMM yyyy")}
                       </p>
                     </div>
                   </div>
@@ -1803,7 +1783,7 @@ const Policy = () => {
                     </div>
                     <div className="ps-4">
                       {/* Check if policy applies to all employees */}
-                      {viewingPolicy.applyToAll ? (
+                      {viewingPolicyType.applyToAll ? (
                         <div className="border rounded p-4 bg-success bg-opacity-10">
                           <div className="d-flex align-items-center">
                             <span className="avatar avatar-lg bg-success me-3">
@@ -1818,9 +1798,9 @@ const Policy = () => {
                             </div>
                           </div>
                         </div>
-                      ) : viewingPolicy.assignTo && viewingPolicy.assignTo.length > 0 ? (
+                      ) : viewingPolicyType.assignTo && viewingPolicyType.assignTo.length > 0 ? (
                         <div className="departments-list">
-                          {viewingPolicy.assignTo.map((mapping, index) => {
+                          {viewingPolicyType.assignTo.map((mapping, index) => {
                             const hasSpecificDesignations = mapping.designationIds && mapping.designationIds.length > 0;
                             const deptDesignations = hasSpecificDesignations 
                               ? designations.filter(d => mapping.designationIds.includes(d._id))
@@ -1870,7 +1850,7 @@ const Policy = () => {
                     </div>
                   </div>
 
-                  {/* Policy Description */}
+                  {/* PolicyType Description */}
                   <div className="mb-3">
                     <div className="d-flex align-items-center mb-2">
                       <i className="ti ti-file-description text-primary me-2 fs-20"></i>
@@ -1879,7 +1859,7 @@ const Policy = () => {
                     <div className="ps-4">
                       <div className="border rounded p-3 bg-light">
                         <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-                          {viewingPolicy.policyDescription || 'No description provided'}
+                          {viewingPolicyType.policyDescription || 'No description provided'}
                         </p>
                       </div>
                     </div>
@@ -1900,7 +1880,7 @@ const Policy = () => {
           </div>
         </div>
       </div>
-      {/* /View Policy */}
+      {/* /View PolicyType */}
     </>
 
   )

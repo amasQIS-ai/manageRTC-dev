@@ -4,19 +4,23 @@ import router from "./router.js";
 import { clerkClient, verifyToken } from "@clerk/express";
 dotenv.config();
 
+// ⚠️ SECURITY WARNING: Development mode is hardcoded to true!
+// This is a DEVELOPMENT workaround that MUST be removed before production deployment.
+// In production, this should be: process.env.NODE_ENV !== "production"
+// Rate limiting and companyId auto-assignment are DISABLED in development mode!
+const isDevelopment = process.env.NODE_ENV === "development" || process.env.DEV_MODE === "true";
+
 // Rate limiting configuration (disabled in development)
-// const isDevelopment =
-//   process.env.NODE_ENV === "development" ||
-//   process.env.NODE_ENV !== "production";
-const isDevelopment = true;
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 100; // Max requests per minute per user
 
 const checkRateLimit = (userId) => {
-  // Skip rate limiting in development
+  // ⚠️ SECURITY: Rate limiting disabled in development mode!
+  // This is a DEVELOPMENT workaround that MUST be removed before production deployment.
   if (isDevelopment) {
+    console.warn("⚠️ Rate limiting DISABLED in development mode!");
     return true;
   }
 
@@ -133,11 +137,17 @@ export const socketHandler = (httpServer) => {
         let role = user.publicMetadata?.role;
         let companyId = user.publicMetadata?.companyId || null;
 
-        // TEMPORARY FIX: Auto-assign companyId for admin users in development
+        // ⚠️ SECURITY WARNING: DEVELOPMENT WORKAROUND!
+        // Auto-assigning companyId for admin users in development
+        // This is a TEMPORARY FIX that MUST be removed before production deployment!
+        // Hardcoded companyId: 68443081dcdfe43152aebf80
         if (isDevelopment && role === "admin" && !companyId) {
           companyId = "68443081dcdfe43152aebf80";
-          console.log(
-            `🔧 Development fix: Auto-assigning companyId ${companyId} to admin user`
+          console.warn(
+            `🔧 DEVELOPMENT WORKAROUND: Auto-assigning companyId ${companyId} to admin user`
+          );
+          console.warn(
+            "⚠️ This hardcoded companyId assignment MUST be removed before production!"
           );
         }
 

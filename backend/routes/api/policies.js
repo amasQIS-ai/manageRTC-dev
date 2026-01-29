@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authenticate } from '../../middleware/auth.js';
 import {
   getAllPolicies,
   getPolicyById,
@@ -18,7 +18,7 @@ import {
 const router = express.Router();
 
 // All routes require authentication
-router.use(authMiddleware);
+router.use(authenticate);
 
 /**
  * @route   GET /api/policies

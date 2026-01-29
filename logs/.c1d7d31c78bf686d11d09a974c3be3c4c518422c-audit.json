@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\SUDHAKAR\\Documents\\GitHub\\hrms-tool-amasqis\\logs\\.c1d7d31c78bf686d11d09a974c3be3c4c518422c-audit.json",
+    "files": [
+        {
+            "date": 1769670626043,
+            "name": "C:\\Users\\SUDHAKAR\\Documents\\GitHub\\hrms-tool-amasqis\\logs\\error-2026-01-29.log",
+            "hash": "6b24ea8eb11fd61c9b24fea89f48158a7cde4984e94168ffe8b472c219cf1eb5"
+        }
+    ],
+    "hashType": "sha256"
+}

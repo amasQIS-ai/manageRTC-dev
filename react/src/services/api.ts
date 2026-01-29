@@ -155,8 +155,9 @@ export const patch = async <T = any>(url: string, data?: any, config?: RequestCo
 };
 
 // Generic DELETE request
-export const del = async <T = any>(url: string, config?: RequestConfig): Promise<ApiResponse<T>> => {
-  const response = await apiClient.delete<ApiResponse<T>>(url, config);
+// Note: Axios delete with body requires { data: ... } in config
+export const del = async <T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> => {
+  const response = await apiClient.delete<ApiResponse<T>>(url, data ? { data, ...config } : config);
   return response.data;
 };
 

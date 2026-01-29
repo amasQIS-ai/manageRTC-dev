@@ -60,9 +60,18 @@ export const useDepartmentsREST = () => {
 
       if (response.success && response.data) {
         setDepartments(response.data);
-        if (response.stats) {
-          setStats(response.stats as DepartmentStats);
-        }
+        // Calculate stats from the departments data
+        const total = response.data.length;
+        const activeCount = response.data.filter(d => d.status === 'Active').length;
+        const inactiveCount = response.data.filter(d => d.status === 'Inactive').length;
+        // Get recent count (created in last 7 days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const recentCount = response.data.filter(d => {
+          if (!d.createdAt) return false;
+          return new Date(d.createdAt) >= sevenDaysAgo;
+        }).length;
+        setStats({ totalDepartments: total, activeCount, inactiveCount, recentCount });
       } else {
         throw new Error(response.error?.message || 'Failed to fetch departments');
       }

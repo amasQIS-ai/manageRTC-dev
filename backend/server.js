@@ -1,52 +1,54 @@
-import express from "express";
-import { createServer } from "http";
-import cors from "cors";
-import path from "path";
-import fs from "fs";
 import { config } from "dotenv";
-import { connectDB } from "./config/db.js";
-import { socketHandler } from "./socket/index.js";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+config();
+
 import { clerkClient } from "@clerk/clerk-sdk-node";
-import socialFeedRoutes from "./routes/socialfeed.routes.js";
-import dealRoutes from "./routes/deal.routes.js";
+import cors from "cors";
+import express from "express";
+import fs from "fs";
+import { createServer } from "http";
+import path from "path";
+import { fileURLToPath } from "url";
+import { connectDB } from "./config/db.js";
+import { startPromotionScheduler } from "./jobs/promotionScheduler.js";
 import companiesRoutes from "./routes/companies.routes.js";
 import contactRoutes from "./routes/contacts.routes.js";
-import goalTypeRoutes from "./routes/performance/goalType.routes.js";
+import dealRoutes from "./routes/deal.routes.js";
 import goalTrackingRoutes from "./routes/performance/goalTracking.routes.js";
+import goalTypeRoutes from "./routes/performance/goalType.routes.js";
+import socialFeedRoutes from "./routes/socialfeed.routes.js";
 import ticketRoutes from "./routes/tickets.routes.js";
-import { startPromotionScheduler } from "./jobs/promotionScheduler.js";
+import { socketHandler } from "./socket/index.js";
 
 // Swagger/OpenAPI Documentation
 import { specs, swaggerUi } from "./config/swagger.js";
 
 
 
-import performanceIndicatorRoutes from "./routes/performance/performanceIndicator.routes.js";
 import performanceAppraisalRoutes from "./routes/performance/performanceAppraisal.routes.js";
+import performanceIndicatorRoutes from "./routes/performance/performanceIndicator.routes.js";
 import performanceReviewRoutes from "./routes/performance/performanceReview.routes.js";
 
 // REST API Routes (Socket.IO to REST Migration)
-import employeeRoutes from "./routes/api/employees.js";
-import projectRoutes from "./routes/api/projects.js";
-import taskRoutes from "./routes/api/tasks.js";
-import leadRoutes from "./routes/api/leads.js";
-import clientRoutes from "./routes/api/clients.js";
-import attendanceRoutes from "./routes/api/attendance.js";
-import leaveRoutes from "./routes/api/leave.js";
-import assetRoutes from "./routes/api/assets.js";
-import trainingRoutes from "./routes/api/training.js";
-import activityRoutes from "./routes/api/activities.js";
-import pipelineRoutes from "./routes/api/pipelines.js";
-import holidayTypeRoutes from "./routes/api/holiday-types.js";
-import promotionRoutes from "./routes/api/promotions.js";
-import departmentRoutes from "./routes/api/departments.js";
-import policyRoutes from "./routes/api/policies.js";
-import designationRoutes from "./routes/api/designations.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-
-config();
+import activityRoutes from "./routes/api/activities.js";
+import assetRoutes from "./routes/api/assets.js";
+import attendanceRoutes from "./routes/api/attendance.js";
+import clientRoutes from "./routes/api/clients.js";
+import departmentRoutes from "./routes/api/departments.js";
+import designationRoutes from "./routes/api/designations.js";
+import employeeRoutes from "./routes/api/employees.js";
+import holidayTypeRoutes from "./routes/api/holiday-types.js";
+import holidayRoutes from "./routes/api/holidays.js";
+import leadRoutes from "./routes/api/leads.js";
+import leaveRoutes from "./routes/api/leave.js";
+import pipelineRoutes from "./routes/api/pipelines.js";
+import policyRoutes from "./routes/api/policies.js";
+import projectRoutes from "./routes/api/projects.js";
+import promotionRoutes from "./routes/api/promotions.js";
+import resignationRoutes from "./routes/api/resignations.js";
+import taskRoutes from "./routes/api/tasks.js";
+import terminationRoutes from "./routes/api/terminations.js";
+import trainingRoutes from "./routes/api/training.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,7 +69,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
@@ -157,6 +159,9 @@ const initializeServer = async () => {
     app.use("/api/departments", departmentRoutes);
     app.use("/api/policies", policyRoutes);
     app.use("/api/designations", designationRoutes);
+    app.use("/api/resignations", resignationRoutes);
+    app.use("/api/terminations", terminationRoutes);
+    app.use("/api/holidays", holidayRoutes);
 
     // API Documentation (Swagger)
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
@@ -208,18 +213,18 @@ const initializeServer = async () => {
       try {
         const { filename } = req.params;
         const filePath = path.join(__dirname, 'public', 'exports', filename);
-        
+
         // Check if file exists
         if (fs.existsSync(filePath)) {
           // Set appropriate headers for download
           res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-          
+
           if (filename.endsWith('.pdf')) {
             res.setHeader('Content-Type', 'application/pdf');
           } else if (filename.endsWith('.csv')) {
             res.setHeader('Content-Type', 'text/csv');
           }
-          
+
           // Stream the file
           const fileStream = fs.createReadStream(filePath);
           fileStream.pipe(res);
@@ -237,7 +242,7 @@ const initializeServer = async () => {
       try {
         const { filename } = req.params;
         const filePath = path.join(__dirname, 'public', 'exports', filename);
-        
+
         // Check if file exists
         if (fs.existsSync(filePath)) {
           // Set appropriate headers
@@ -248,7 +253,7 @@ const initializeServer = async () => {
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
           }
-          
+
           // Stream the file
           const fileStream = fs.createReadStream(filePath);
           fileStream.pipe(res);

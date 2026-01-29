@@ -1,28 +1,37 @@
+import * as bootstrap from "bootstrap";
+import { ClerkProvider } from "@clerk/clerk-react";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import { base_path } from "./environment";
-import * as bootstrap from "bootstrap";
-import "../node_modules/bootstrap/dist/css/bootstrap.min.css";
-import "../src/style/css/feather.css";
-import "../src/index.scss";
-import store from "./core/data/redux/store";
 import { Provider } from "react-redux";
-import "../src/style/icon/boxicons/boxicons/css/boxicons.min.css";
-import "../src/style/icon/weather/weathericons.css";
-import "../src/style/icon/typicons/typicons.css";
-import "../node_modules/@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import { BrowserRouter } from "react-router-dom";
+
 import "../node_modules/@fortawesome/fontawesome-free/css/all.min.css";
+import "../node_modules/@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import "../node_modules/bootstrap/dist/css/bootstrap.min.css";
+import "../src/index.scss";
+import "../src/style/css/feather.css";
+import "../src/style/icon/boxicons/boxicons/css/boxicons.min.css";
 import "../src/style/icon/ionic/ionicons.css";
 import "../src/style/icon/tabler-icons/webfont/tabler-icons.css";
+import "../src/style/icon/typicons/typicons.css";
+import "../src/style/icon/weather/weathericons.css";
 import ALLRoutes from "./feature-module/router/router";
-// Clerk
-import { ClerkProvider } from "@clerk/clerk-react";
-import { SocketProvider } from "./SocketContext";
+import { base_path } from "./environment";
+import store from "./core/data/redux/store";
 import { AuthProvider } from "./services/AuthProvider";
+import { SocketProvider } from "./SocketContext";
 
 // Expose Bootstrap globally so that data-bs-toggle="dropdown" and modal work
 (window as any).bootstrap = bootstrap;
+
+// SECURITY: Clerk publishable key from environment variable
+const clerkPubKey = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
+
+if (!clerkPubKey) {
+  console.error("❌ SECURITY ERROR: REACT_APP_CLERK_PUBLISHABLE_KEY not found in environment variables!");
+  console.error("Please add it to your .env file:");
+  console.error("REACT_APP_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here");
+}
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -30,7 +39,7 @@ const root = ReactDOM.createRoot(
 root.render(
   // <React.StrictMode>
   <ClerkProvider
-    publishableKey="pk_test_dXAtc2tpbmstNC5jbGVyay5hY2NvdW50cy5kZXYk"
+    publishableKey={clerkPubKey || ""}
     afterSignOutUrl="/"
   >
     <AuthProvider>

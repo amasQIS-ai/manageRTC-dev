@@ -3,8 +3,8 @@
  * REST API endpoints for department management
  */
 
-import Department from '../../models/department.model.js';
-import { logger } from '../../utils/logger.js';
+import Department from '../../models/organization/department.schema.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Get all departments with optional filters

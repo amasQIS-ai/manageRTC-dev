@@ -14,12 +14,12 @@ import {
   searchDepartments,
   getDepartmentStats
 } from '../../controllers/rest/department.controller.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authenticate } from '../../middleware/auth.js';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(authenticate);
 
 /**
  * @route   GET /api/departments

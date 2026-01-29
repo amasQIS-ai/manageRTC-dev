@@ -4,7 +4,7 @@
  */
 
 import { displayDesignations } from '../../services/hr/hrm.designation.js';
-import { logger } from '../../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Get all designations with optional filtering

@@ -1,17 +1,18 @@
 // react/src/employees/departments.jsx
 
-import React, { useState, useEffect } from 'react'
-import { all_routes } from '../../router/all_routes'
-import { Link } from 'react-router-dom'
+import { message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
 import Table from "../../../core/common/dataTable/index";
 import CommonSelect from '../../../core/common/commonSelect';
-import { department_details } from '../../../core/data/json/department_details';
 import CollapseHeader from '../../../core/common/collapse-header/collapse-header';
+import { department_details } from '../../../core/data/json/department_details';
+import Footer from "../../../core/common/footer";
 import { departmentName } from '../../../core/common/selectoption/selectoption';
 import { useDepartmentsREST } from "../../../hooks/useDepartmentsREST";
-import Footer from "../../../core/common/footer";
 import { showModal, hideModal, cleanupModalBackdrops } from '../../../utils/modalUtils';
-import { message } from 'antd';
+import { all_routes } from '../../router/all_routes';
 
 type PasswordField = "password" | "confirmPassword";
 
@@ -19,7 +20,7 @@ type PasswordField = "password" | "confirmPassword";
 interface Departments {
   _id: string;
   department: string;
-  employeeCount: number;
+  employeeCount?: number;     // Made optional to match hook's Department interface
   designationCount?: number;  // Count of designations in this department
   policyCount?: number;       // Count of policies assigned to this department
   status: string;
@@ -230,7 +231,7 @@ const Department = () => {
       setIsSubmitting(true);
       const payload = {
         department: departmentName,
-        status: selectedStatus,
+        status: selectedStatus as 'Active' | 'Inactive',
       };
 
       const success = await createDepartment(payload);
@@ -275,7 +276,7 @@ const Department = () => {
       return 0;
     });
     setSortedDepartments(sortedData);
-    setDepartments(sortedData);
+    // Note: We don't update departments directly as sortedData is derived from it
   };
 
   const applyFilters = async (updatedFields: {
@@ -320,7 +321,7 @@ const Department = () => {
       setIsUpdating(true);
 
       // Ensure status is stored with proper capitalization
-      const normalizedStatus = normalizeStatus(status);
+      const normalizedStatus = normalizeStatus(status) as 'Active' | 'Inactive';
 
       const success = await updateDepartment(_id, {
         department,
